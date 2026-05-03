@@ -6,39 +6,133 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Figma Sync — Master Controller</title>
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, sans-serif; }
-    #figma-frame { border: none; width: 100%; height: 100%; }
-    #status {
-      position: fixed; top: 12px; right: 12px; z-index: 9999;
-      padding: 6px 14px; border-radius: 20px; font: 600 11px/1 sans-serif;
-      text-transform: uppercase; color: #fff; background: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      transition: opacity 0.4s ease; pointer-events: none;
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-    #status.connected { color: #4ade80; }
-    #status.disconnected { color: #f87171; }
-    #status.hidden { opacity: 0; }
-    #flash { position: fixed; inset: 0; background: #fff; pointer-events: none; opacity: 0; z-index: 9998; }
-    @keyframes flash-out { 0% { opacity: 0.3; } 100% { opacity: 0; } }
-    #flash.active { animation: flash-out 0.3s ease-out forwards; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #figma-frame {
+      border: none;
+      width: 100%;
+      height: 100%;
+    }
+
+    #status {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 9999;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font: 600 11px/1 sans-serif;
+      text-transform: uppercase;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: opacity 0.4s ease;
+      pointer-events: none;
+    }
+
+    #status.connected {
+      color: #4ade80;
+    }
+
+    #status.disconnected {
+      color: #f87171;
+    }
+
+    #status.hidden {
+      opacity: 0;
+    }
+
+    #flash {
+      position: fixed;
+      inset: 0;
+      background: #fff;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 9998;
+    }
+
+    @keyframes flash-out {
+      0% {
+        opacity: 0.3;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    #flash.active {
+      animation: flash-out 0.3s ease-out forwards;
+    }
+
+    /* ── HUD Bar ────────────────────────────────────────────────── */
     #hud {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 9999;
-      background: rgba(18, 18, 18, 0.85); backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.1); padding: 10px 24px; border-radius: 40px;
-      display: flex; align-items: center; gap: 20px; color: #fff;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      background: rgba(18, 18, 18, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 10px 24px;
+      border-radius: 40px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: #fff;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     }
-    #hud kbd { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; padding: 2px 6px; font-size: 12px; margin-right: 4px; }
-    #hud span { font-size: 13px; font-weight: 500; display: flex; align-items: center; }
-    #hud .sep { color: rgba(255, 255, 255, 0.15); }
+
+    #hud kbd {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 12px;
+      margin-right: 4px;
+      font-family: inherit;
+    }
+
+    #hud span {
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+    #hud .sep {
+      color: rgba(255, 255, 255, 0.15);
+    }
   </style>
 </head>
 
 <body>
+
   <div id="status" class="disconnected">Connecting…</div>
   <div id="flash"></div>
+
   <iframe id="figma-frame" allowfullscreen></iframe>
+
+  <!-- HUD bar — visible only on the controller laptop -->
   <div id="hud">
     <span><kbd>←</kbd> Prev</span>
     <span class="sep">│</span>
@@ -48,32 +142,27 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+
   <script>
-    (async () => {
+    (() => {
       "use strict";
+
       const iframe = document.getElementById("figma-frame");
       const statusEl = document.getElementById("status");
+      const flash = document.getElementById("flash");
       const clientsCount = document.getElementById("clients-count");
+
+      // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
-
-      // ── 1. Fetch Central Configuration ────────────────────────────
-      let config = {};
-      try {
-        const response = await fetch('/api/config');
-        config = await response.json();
-      } catch (err) {
-        console.warn("[config] Could not fetch central config.");
-      }
-
-      const controllerSettings = (config.devices && config.devices.controller) ? config.devices.controller : {};
-
-      const fileId = params.get('file') || config.fileId || 'YOUR_FILE_ID';
-      const nodeId = params.get('node') || controllerSettings.nodeId || 'YOUR_NODE_ID';
-      const clientId = params.get('client') || config.clientId || 'YOUR_CLIENT_ID';
+      const fileId = params.get('file') || 'YOUR_FILE_ID';
+      const nodeId = params.get('node') || 'YOUR_NODE_ID';
+      const clientId = params.get('client') || 'YOUR_CLIENT_ID';
       const host = params.get('host') || 'multi-device-sync';
 
+      // Build and set the iframe URL
       if (fileId !== 'YOUR_FILE_ID') {
-        iframe.src = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
+        const figmaUrl = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
+        iframe.src = figmaUrl;
       }
 
       // ── 2. Socket Connection ──────────────────────────────────────
@@ -81,7 +170,7 @@
       let hideTimer;
 
       socket.on("connect", () => {
-        statusEl.textContent = "Connected (Master)";
+        statusEl.textContent = "Connected";
         statusEl.className = "connected";
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => statusEl.classList.add("hidden"), 3000);
@@ -103,14 +192,19 @@
         iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
 
+      // ── 3. Interaction & Keyboard ──────────────────────────────────
       window.addEventListener("keydown", (e) => {
         if (e.key === "ArrowRight") socket.emit("trigger-action", { direction: "next" });
         if (e.key === "ArrowLeft") socket.emit("trigger-action", { direction: "prev" });
       }, { capture: true });
 
-      window.addEventListener("blur", () => setTimeout(() => window.focus(), 100));
+      // Focus reclaiming
+      window.addEventListener("blur", () => {
+        setTimeout(() => window.focus(), 100);
+      });
       document.addEventListener("click", () => window.focus());
     })();
   </script>
 </body>
+
 </html>

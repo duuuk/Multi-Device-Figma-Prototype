@@ -61,41 +61,47 @@ Every Figma prototype has two unique IDs you need:
 
 ## 📱 Step 4: Connecting Devices
 
-Both the Controller and the Clients are now powered by a **Central Configuration**. You only need to edit **`config.json`** once.
-
-### ⚙️ The Setup (One-time)
-1. Rename `config.example.json` to `config.json`.
-2. Fill in your `fileId`, `clientId`, and the `nodeId` for each of your devices.
+Both the Controller and the Clients are dynamic. You do not need to edit any code—just use URL parameters to tell the app which prototype to load.
 
 ### 🕹 The Controller (Master Laptop)
 Open your browser to:
-`http://localhost:3000/controller.html`
+`http://localhost:3000/controller.html?file=<FILE_ID>&node=<NODE_ID>&client=<CLIENT_ID>`
 
-- The controller will automatically load the `controller` node defined in your `config.json`.
+- **Controls**: Use **ArrowRight** (Next) and **ArrowLeft** (Prev) to sync all devices.
+- **Focus**: The controller aggressively reclaims focus, so you can click the prototype and still use the keyboard.
 
 ### 📺 The Clients (iPads)
-On each iPad, navigate to the universal client URL using an **ID** that matches your `config.json`:
+On each iPad, navigate to the URL using the dynamic parameters. You can connect as many iPads as you want to the same hub.
 
-- **iPad 1**: `http://<YOUR_IP>:3000/client.html?id=left`
-- **iPad 2**: `http://<YOUR_IP>:3000/client.html?id=center`
-- **iPad 3**: `http://<YOUR_IP>:3000/client.html?id=right`
+`http://<YOUR_IP>:3000/client.html?file=<FILE_ID>&node=<NODE_ID>&client=<CLIENT_ID>&scale=1.14`
+
+#### Comprehensive URL Parameter List:
+| Parameter | Description | Example |
+| :--- | :--- | :--- |
+| `file` | The Figma File ID. | `file=EWK1ff7...` |
+| `node` | The specific Frame ID. | `node=567:12477` |
+| `client` | Your Figma App Client ID. | `client=eiKojha...` |
+| `scale` | **The Over-scan Trick** (Clients). Zooms to hide edges. | `scale=1.12` |
+| `debug` | Shows the red "Tap Zone" layer for testing. | `debug=true` |
+
+#### Real-World Examples for a 3-iPad Setup:
+- **iPad 1**: `.../client.html?node=101:1&scale=1.14&file=ABC&client=XYZ`
+- **iPad 2**: `.../client.html?node=101:2&scale=1.14&file=ABC&client=XYZ`
+- **iPad 3**: `.../client.html?node=101:3&scale=1.14&file=ABC&client=XYZ`
 
 ---
 
 ## 💎 Pro-Tips for Installations
 
-### 1. Adding More Devices
-To add a 4th iPad:
-1. Add a new entry to the `devices` object in `config.json`.
-2. Open `client.html?id=new_device_name` on the iPad.
-3. No code changes required!
-
-### 2. Hide the Browser UI (PWA Mode)
+### 1. Hide the Browser UI (PWA Mode)
 To make it look like a native application on the iPad:
 1. Open the client URL in **Safari**.
 2. Tap the **Share** icon.
 3. Select **"Add to Home Screen"**.
-4. Launch the app from the Home Screen. It will now run in **full-screen standalone mode**.
+4. Launch the app from the Home Screen. It will now run in **full-screen standalone mode** with no address bar.
+
+### 2. Perfect "Slicing"
+Create 3 Frames in Figma that are exactly the resolution of the iPads (e.g., 2360x1640). Place them side-by-side in your Figma file. Use the `node` parameter to point each iPad to its respective frame.
 
 ### 3. Smart Animate Consistency
 For smooth transitions, ensure your frames in Figma have **matching layer names** across all slices. If "Layer A" exists on the Left iPad but is missing or named differently on the Center iPad, the sync will feel disjointed. Smart Animate relies on naming consistency across the entire prototype.

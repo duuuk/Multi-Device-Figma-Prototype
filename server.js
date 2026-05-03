@@ -2,8 +2,6 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const os = require("os");
-const fs = require("fs");
-const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -12,31 +10,6 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-
-// ── Central Configuration ───────────────────────────────────────────
-let config = {};
-const configPath = path.join(__dirname, 'config.json');
-
-function loadConfig() {
-  try {
-    if (fs.existsSync(configPath)) {
-      const rawData = fs.readFileSync(configPath);
-      config = JSON.parse(rawData);
-      console.log('[config] Central configuration loaded.');
-    } else {
-      console.warn('[config] config.json not found. Using empty config.');
-    }
-  } catch (err) {
-    console.error('[config] Error loading config.json:', err);
-  }
-}
-
-loadConfig();
-
-// Serve the config to clients
-app.get('/api/config', (req, res) => {
-  res.json(config);
-});
 
 // ── Serve static files from /public ──────────────────────────────────
 app.use(express.static("public"));
