@@ -1,0 +1,14 @@
+{
+  "name": "multi-device-figma-prototype",
+  "version": "1.0.0",
+  "description": "Synchronized multi-device Figma prototype controller using Socket.io and the Figma Embed API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  }
+}
