@@ -67,13 +67,15 @@ Both the Controller and the Clients are dynamic. You do not need to edit any cod
 Open your browser to:
 `http://localhost:3000/controller.html?file=<FILE_ID>&node=<NODE_ID>&client=<CLIENT_ID>`
 
-- **Controls**: Use **ArrowRight** (Next) and **ArrowLeft** (Prev) to sync all devices.
-- **Focus**: The controller aggressively reclaims focus, so you can click the prototype and still use the keyboard.
+- **Pro Tip**: To make this permanent, open `controller.html` and replace `'YOUR_FILE_ID'`, etc., in the `<script>` section.
+- **Controls**: Use **ArrowRight** (Next) and **ArrowLeft** (Prev).
 
 ### 📺 The Clients (iPads)
 On each iPad, navigate to the URL using the dynamic parameters. You can connect as many iPads as you want to the same hub.
 
 `http://<YOUR_IP>:3000/client.html?file=<FILE_ID>&node=<NODE_ID>&client=<CLIENT_ID>&scale=1.14`
+
+- **Pro Tip**: You can also hardcode these values directly in the `<script>` section of `client.html` for a one-click iPad experience.
 
 #### Comprehensive URL Parameter List:
 | Parameter | Description | Example |
