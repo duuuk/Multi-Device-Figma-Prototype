@@ -21,14 +21,8 @@
       height: 100%;
       overflow: hidden;
       background: #000;
-      /* Pure black for the bars if they show */
     }
 
-    /* 
-       The "Over-scan" trick:
-       We make the iframe slightly larger than the screen (e.g., 105%)
-       and center it to hide Figma's default margins/edges.
-    */
     #iframe-container {
       position: fixed;
       inset: 0;
@@ -40,7 +34,6 @@
 
     #figma-frame {
       border: none;
-      /* These dimensions will be boosted by the 'scale' parameter in JS */
       width: 100vw;
       height: 100vh;
       transition: transform 0.3s ease;
@@ -63,17 +56,9 @@
       pointer-events: none;
     }
 
-    #status.connected {
-      color: #4ade80;
-    }
-
-    #status.disconnected {
-      color: #f87171;
-    }
-
-    #status.hidden {
-      opacity: 0;
-    }
+    #status.connected { color: #4ade80; }
+    #status.disconnected { color: #f87171; }
+    #status.hidden { opacity: 0; }
   </style>
 </head>
 
@@ -88,35 +73,43 @@
   <script src="/socket.io/socket.io.js"></script>
 
   <script>
-    (() => {
+    (async () => {
       "use strict";
 
       const iframe = document.getElementById("figma-frame");
       const status = document.getElementById("status");
-
-      // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
+      const deviceId = params.get('id'); // e.g. 'left', 'center', 'right'
 
-      // Values from your PROJECT_NAME prototype
-      const fileId = params.get('file') || 'YOUR_FILE_ID';
-      const nodeId = params.get('node') || 'YOUR_NODE_ID';
-      const clientId = params.get('client') || 'YOUR_CLIENT_ID';
+      // ── 1. Fetch Central Configuration ────────────────────────────
+      let config = {};
+      try {
+        const response = await fetch('/api/config');
+        config = await response.json();
+      } catch (err) {
+        console.warn("[config] Could not fetch central config, using URL params.");
+      }
+
+      const deviceSettings = (config.devices && deviceId) ? config.devices[deviceId] : {};
+
+      // ── 2. Determine Final Values ─────────────────────────────────
+      // Priority: URL Param > Central Config > Placeholder
+      const fileId = params.get('file') || config.fileId || 'YOUR_FILE_ID';
+      const clientId = params.get('client') || config.clientId || 'YOUR_CLIENT_ID';
+      const nodeId = params.get('node') || deviceSettings.nodeId || 'YOUR_NODE_ID';
+      const zoom = params.get('scale') || deviceSettings.scale || '1.14';
       const host = params.get('host') || 'multi-device-sync';
 
-      // 'scale' allows you to zoom in slightly to hide edges (e.g., 1.05)
-      const zoom = params.get('scale') || '1.14';
+      // Apply settings
       iframe.style.transform = `scale(${zoom})`;
+      iframe.src = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
 
-      // Build the URL
-      const figmaUrl = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
-      iframe.src = figmaUrl;
-
-      // ── 2. Socket Connection ──────────────────────────────────────
+      // ── 3. Socket Connection ──────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
 
       socket.on("connect", () => {
-        status.textContent = "Connected";
+        status.textContent = deviceId ? `Connected (${deviceId})` : "Connected";
         status.className = "connected";
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => status.classList.add("hidden"), 3000);

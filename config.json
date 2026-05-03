@@ -1,0 +1,22 @@
+{
+  "fileId": "EWK1ff7BIxdh6vTi0ttC6f",
+  "clientId": "eiKojhazOoj470Gs1xyATm",
+  "devices": {
+    "controller": {
+      "nodeId": "567:12477",
+      "name": "Master Controller"
+    },
+    "left": {
+      "nodeId": "567:12477",
+      "scale": 1.14
+    },
+    "center": {
+      "nodeId": "653:6588",
+      "scale": 1.14
+    },
+    "right": {
+      "nodeId": "662:13242",
+      "scale": 1.14
+    }
+  }
+}
