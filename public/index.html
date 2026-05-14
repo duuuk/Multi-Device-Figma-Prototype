@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Figma Sync</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --geist-bg: #000000;
+      --geist-foreground: #ffffff;
+      --accents-1: #111111;
+      --accents-2: #333333;
+      --accents-3: #444444;
+      --accents-4: #666666;
+      --accents-5: #888888;
+      --accents-6: #999999;
+      --accents-7: #eaeaea;
+      --accents-8: #fafafa;
+      
+      --radius: 6px;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--geist-bg);
+      color: var(--accents-8);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px;
+      border-bottom: 1px solid var(--accents-2);
+    }
+
+    .nav-brand {
+      font-weight: 600;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    .nav-link {
+      color: var(--accents-5);
+      text-decoration: none;
+      transition: color 0.2s ease;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .nav-link:hover {
+      color: var(--geist-foreground);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 48px 24px 100px;
+      width: 100%;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+      margin-bottom: 8px;
+      color: var(--geist-foreground);
+    }
+
+    p.subtitle {
+      color: var(--accents-5);
+      font-size: 16px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 420px 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .device-row {
+      padding: 16px;
+      margin-bottom: 12px;
+      border: 1px solid var(--accents-2);
+      border-radius: var(--radius);
+      background: var(--accents-1);
+      transition: border-color 0.2s ease;
+    }
+
+    .device-row:hover {
+      border-color: var(--accents-4);
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: var(--geist-foreground);
+      letter-spacing: -0.02em;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+    
+    .form-row .form-group {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accents-5);
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      color: var(--geist-foreground);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      transition: border-color 0.2s ease, color 0.2s ease;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accents-5);
+    }
+    
+    input::placeholder {
+      color: var(--accents-4);
+    }
+    
+    input[readonly] {
+      background: var(--accents-1);
+      color: var(--accents-6);
+      cursor: default;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      background: var(--geist-foreground);
+      color: var(--geist-bg);
+      border: 1px solid var(--geist-foreground);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background: var(--accents-7);
+      border-color: var(--accents-7);
+    }
+    
+    .btn-outline {
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      color: var(--geist-foreground);
+    }
+
+    .btn-outline:hover {
+      background: var(--accents-1);
+      border-color: var(--accents-5);
+    }
+
+    .device-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .device-header input {
+      font-size: 14px;
+      font-weight: 500;
+      background: transparent;
+      border: none;
+      padding: 0;
+      width: auto;
+      flex-grow: 1;
+      margin-right: 12px;
+    }
+    
+    .device-header input:focus {
+      border-bottom: 1px solid var(--accents-5);
+      border-radius: 0;
+    }
+    
+    .btn-remove {
+      background: transparent;
+      color: var(--accents-5);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      padding: 4px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-remove:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .devices-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .device-card {
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    
+    .device-card h3 {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      color: var(--geist-foreground);
+    }
+    
+    .device-card p {
+      font-size: 13px;
+      color: var(--accents-5);
+      margin-bottom: 16px;
+    }
+
+    .qr-container {
+      background: #fff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+    
+    .qr-container img {
+      display: block;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .info-box {
+      border: 1px solid var(--accents-2);
+      padding: 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--accents-6);
+      margin-bottom: 24px;
+      background: var(--accents-1);
+    }
+
+    .info-box strong {
+      color: var(--geist-foreground);
+      font-weight: 500;
+    }
+
+    .info-box a {
+      color: var(--geist-foreground);
+      text-decoration: underline;
+      text-decoration-color: var(--accents-2);
+      text-underline-offset: 2px;
+      transition: text-decoration-color 0.2s;
+    }
+
+    .info-box a:hover {
+      text-decoration-color: var(--geist-foreground);
+    }
+
+    .info-box ol {
+      margin-left: 20px;
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+
+    code {
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: var(--accents-2);
+      color: var(--accents-8);
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    /* Modals */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+      box-shadow: 0 24px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--accents-2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--geist-foreground);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--accents-5);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    
+    .modal-close:hover {
+      color: var(--geist-foreground);
+    }
+
+    .modal-content {
+      padding: 24px;
+      color: var(--accents-6);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    
+    .modal-content h4 {
+      color: var(--geist-foreground);
+      margin-top: 16px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    .modal-content ul, .modal-content ol {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+
+    .modal-content a {
+      color: var(--geist-foreground);
+      text-decoration: underline;
+      text-decoration-color: var(--accents-2);
+      text-underline-offset: 2px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--accents-8);
+      border: 1px solid var(--accents-8);
+      color: var(--geist-bg);
+      padding: 10px 16px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+      pointer-events: none;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="nav-brand">Figma Sync</div>
+    <div class="nav-links">
+      <a class="nav-link" onclick="openModal('modal-protips')">Pro Tips</a>
+      <a class="nav-link" onclick="openModal('modal-troubleshoot')">Troubleshooting</a>
+      <a class="nav-link" onclick="openModal('modal-support')">Support</a>
+      <a href="https://duuuk.vercel.app/" target="_blank" class="nav-link">Made by Dulguun Enkhbat with ♥</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <header>
+      <h1>Project Setup</h1>
+      <p class="subtitle">Configure your multi-device synchronization</p>
+    </header>
+
+    <div class="grid">
+      <!-- Config Form -->
+      <div>
+        
+        <div class="panel">
+          <h2>Global Settings</h2>
+          
+          <div class="info-box">
+            <strong>Figma Access Setup</strong>
+            <ol>
+              <li>Go to the <a href="https://www.figma.com/developers/api#access-tokens" target="_blank">Figma Developer Docs</a>.</li>
+              <li>Click <strong>"My Apps"</strong> in the top right and log in.</li>
+              <li>Click <strong>"+ Create a new app"</strong>.</li>
+              <li>Under OAuth scope, <strong>ONLY check <code>file_content:read</code></strong>.</li>
+              <li>Under "Allowed embed origins", add your current network IP address below: <br>
+                  <div style="margin: 8px 0;">
+                    <code id="networkIpDisplay" style="color: var(--geist-foreground);">Loading IP...</code>
+                  </div>
+                  <em style="font-size: 12px; color: var(--accents-5);">Update this IP whenever you change networks. Use a hotspot for best sync results.</em>
+              </li>
+              <li>Copy the <strong>Client ID</strong> from the credentials tab.</li>
+            </ol>
+          </div>
+
+          <div class="form-group">
+            <label>Client ID (Access Token)</label>
+            <input type="text" id="clientId" placeholder="e.g. YOUR_FIGMA_CLIENT_ID" required>
+          </div>
+          
+          <div class="form-group" style="margin-top: 24px;">
+            <label>Shared Figma File ID</label>
+            <input type="text" id="globalFileId" placeholder="Auto-extracted from URLs below..." readonly>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Master Controller</h2>
+          <div class="form-group">
+            <label>Controller Figma URL</label>
+            <input type="url" id="controllerUrl" class="auto-parse-url" placeholder="Paste presentation link...">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Node ID</label>
+              <input type="text" id="controllerNode" readonly placeholder="Extracted Node ID">
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Target Devices</h2>
+          <p style="font-size: 13px; color: var(--accents-5); margin-bottom: 20px;">
+            Paste the same prototype URL or specific flow URLs for different devices from the same Figma file.
+          </p>
+
+          <div id="targetDevicesList"></div>
+
+          <button type="button" id="addDeviceBtn" class="btn btn-outline" style="margin-bottom: 24px;">
+            + Add Target Device
+          </button>
+
+          <button type="button" id="deployBtn" class="btn">Deploy Links</button>
+        </div>
+      </div>
+
+      <!-- Generated Links & QRs -->
+      <div id="devicesContainer" class="devices-container"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">URL copied to clipboard</div>
+
+  <!-- Modals -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModals(event)">
+    
+    <!-- Pro Tips -->
+    <div class="modal" id="modal-protips" style="display: none;">
+      <div class="modal-header">
+        <h3>Pro Tips</h3>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="modal-content">
+        <h4>1. Hide the Browser UI (PWA Mode)</h4>
+        <p>To make it look like a native application on the iPad:</p>
+        <ol>
+          <li>Open the generated client URL in <strong>Safari</strong>.</li>
+          <li>Tap the <strong>Share</strong> icon.</li>
+          <li>Select <strong>"Add to Home Screen"</strong>.</li>
+          <li>Launch the app from the Home Screen. It will now run in full-screen standalone mode with no address bar.</li>
+        </ol>
+
+        <h4>2. Perfect "Slicing"</h4>
+        <p>Create Frames in Figma that match the exact resolution of your physical screens (e.g., 2360x1640 for iPad Air). Place them side-by-side in your Figma file. Use the dashboard to map each iPad to its respective frame URL.</p>
+
+        <h4>3. Smart Animate Consistency</h4>
+        <p>For smooth transitions, ensure your frames in Figma have <strong>matching layer names</strong> across all slices. Smart Animate relies heavily on naming consistency!</p>
+      </div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="modal" id="modal-troubleshoot" style="display: none;">
+      <div class="modal-header">
+        <h3>Troubleshooting</h3>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="modal-content">
+        <h4>Local Network Discovery (The "Firewall")</h4>
+        <p>Corporate and public Wi-Fi networks often block peer-to-peer communication between devices. If your iPads cannot load the dashboard or communicate with the laptop:</p>
+        <p style="margin-top: 8px;"><strong>Solution:</strong> Use a <strong>dedicated mobile hotspot</strong> or a <strong>travel router</strong>. This ensures a clean, local network where your laptop and iPads can securely talk to each other. Remember to update the IP Address in Figma's allowed origins when you switch networks!</p>
+      </div>
+    </div>
+
+    <!-- Support -->
+    <div class="modal" id="modal-support" style="display: none;">
+      <div class="modal-header">
+        <h3>Support the Project</h3>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="modal-content">
+        <p>If this tool helped you build your installation, consider supporting the work!</p>
+        <p style="margin-top: 16px;">
+          <a href="https://buy.stripe.com/bJeaEX61vfFv8G8arCasg01" target="_blank" style="font-weight: 500;">Donate via Stripe ↗</a>
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <template id="device-template">
+    <div class="device-row">
+      <div class="device-header">
+        <input type="text" class="device-name" placeholder="Device Name" value="New Device">
+        <button type="button" class="btn-remove">Remove</button>
+      </div>
+      <div class="form-group">
+        <label>Figma URL</label>
+        <input type="url" class="device-url auto-parse-url" placeholder="Paste presentation link...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Node ID</label>
+          <input type="text" class="device-node" readonly placeholder="...">
+        </div>
+        <div class="form-group">
+          <label>Scale Factor</label>
+          <input type="text" class="device-scale" value="1.14">
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // Modal logic
+    function openModal(id) {
+      document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+      document.getElementById(id).style.display = 'block';
+      document.getElementById('modalOverlay').classList.add('active');
+    }
+
+    function closeModals(e) {
+      if (!e || e.target.classList.contains('modal-overlay') || e.target.classList.contains('modal-close')) {
+        document.getElementById('modalOverlay').classList.remove('active');
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const targetDevicesList = document.getElementById('targetDevicesList');
+      const addDeviceBtn = document.getElementById('addDeviceBtn');
+      const deployBtn = document.getElementById('deployBtn');
+      const template = document.getElementById('device-template');
+      const devicesContainer = document.getElementById('devicesContainer');
+
+      function parseFigmaUrl(urlStr) {
+        if (!urlStr) return { fileId: null, nodeId: null };
+        try {
+          const url = new URL(urlStr);
+          const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
+          let fileId = fileMatch ? fileMatch[1] : null;
+          let nodeId = url.searchParams.get('node-id');
+          if (nodeId) nodeId = nodeId.replace('-', ':').replace('%3A', ':');
+          return { fileId, nodeId };
+        } catch(e) {
+          return { fileId: null, nodeId: null };
+        }
+      }
+
+      document.body.addEventListener('input', (e) => {
+        if (e.target.classList.contains('auto-parse-url')) {
+          const val = e.target.value.trim();
+          const { fileId, nodeId } = parseFigmaUrl(val);
+          
+          if (e.target.id === 'controllerUrl') {
+            if (nodeId) document.getElementById('controllerNode').value = nodeId;
+            if (fileId) document.getElementById('globalFileId').value = fileId;
+          } else {
+            const row = e.target.closest('.device-row');
+            if (row) {
+              if (nodeId) row.querySelector('.device-node').value = nodeId;
+              if (fileId && !document.getElementById('globalFileId').value) {
+                 document.getElementById('globalFileId').value = fileId;
+              }
+            }
+          }
+        }
+      });
+
+      function createDeviceUI(deviceData) {
+        const clone = template.content.cloneNode(true);
+        const row = clone.querySelector('.device-row');
+        
+        row.querySelector('.device-name').value = deviceData.name || 'iPad';
+        row.querySelector('.device-url').value = deviceData.url || '';
+        row.querySelector('.device-node').value = deviceData.node || '';
+        row.querySelector('.device-scale').value = deviceData.scale || '1.14';
+
+        row.querySelector('.btn-remove').addEventListener('click', () => {
+          row.remove();
+          saveState();
+        });
+
+        targetDevicesList.appendChild(row);
+      }
+
+      addDeviceBtn.addEventListener('click', () => {
+        createDeviceUI({ name: `Target ${targetDevicesList.children.length + 1}` });
+      });
+
+      function saveState() {
+        const state = {
+          clientId: document.getElementById('clientId').value,
+          globalFileId: document.getElementById('globalFileId').value,
+          controllerUrl: document.getElementById('controllerUrl').value,
+          controllerNode: document.getElementById('controllerNode').value,
+          targets: []
+        };
+
+        document.querySelectorAll('.device-row').forEach(row => {
+          state.targets.push({
+            name: row.querySelector('.device-name').value,
+            url: row.querySelector('.device-url').value,
+            node: row.querySelector('.device-node').value,
+            scale: row.querySelector('.device-scale').value
+          });
+        });
+
+        localStorage.setItem('figma_sync_state_v4', JSON.stringify(state));
+      }
+
+      function loadState() {
+        const saved = localStorage.getItem('figma_sync_state_v4');
+        if (saved) {
+          const state = JSON.parse(saved);
+          document.getElementById('clientId').value = state.clientId || '';
+          document.getElementById('globalFileId').value = state.globalFileId || '';
+          document.getElementById('controllerUrl').value = state.controllerUrl || '';
+          document.getElementById('controllerNode').value = state.controllerNode || '';
+          
+          if (state.targets && state.targets.length > 0) {
+            state.targets.forEach(t => createDeviceUI(t));
+          } else {
+            createDeviceUI({ name: 'iPad (Left)', scale: '1.14' });
+            createDeviceUI({ name: 'iPad (Right)', scale: '1.14' });
+          }
+        } else {
+          createDeviceUI({ name: 'iPad (Left)', scale: '1.14' });
+          createDeviceUI({ name: 'iPad (Right)', scale: '1.14' });
+        }
+      }
+
+      deployBtn.addEventListener('click', () => {
+        saveState();
+        generateCards();
+      });
+
+      function generateCards() {
+        devicesContainer.innerHTML = '';
+        
+        const hostUrl = `${window.location.protocol}//${window.location.host}`;
+        const clientId = document.getElementById('clientId').value;
+        const globalFileId = document.getElementById('globalFileId').value;
+        
+        if (!clientId || !globalFileId) {
+          alert("Please provide a Client ID and ensure a Figma URL is pasted to extract the File ID.");
+          return;
+        }
+
+        const cardsData = [];
+
+        const cNode = document.getElementById('controllerNode').value;
+        if (cNode) {
+          cardsData.push({
+            id: 'controller',
+            name: 'Master Controller',
+            desc: 'Laptop driving the presentation',
+            url: `${hostUrl}/controller.html?file=${globalFileId}&node=${cNode}&client=${clientId}`
+          });
+        }
+
+        document.querySelectorAll('.device-row').forEach((row, i) => {
+          const name = row.querySelector('.device-name').value;
+          const node = row.querySelector('.device-node').value;
+          const scale = row.querySelector('.device-scale').value;
+          
+          if (node) {
+            cardsData.push({
+              id: `target-${i}`,
+              name: name,
+              desc: `Scale: ${scale}`,
+              url: `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}`
+            });
+          }
+        });
+
+        cardsData.forEach((device) => {
+          const card = document.createElement('div');
+          card.className = 'device-card';
+          
+          card.innerHTML = `
+            <h3>${device.name}</h3>
+            <p>${device.desc}</p>
+            <div class="qr-container" id="qr-${device.id}"></div>
+            <div class="actions">
+              <a href="${device.url}" target="_blank" class="btn-outline btn-secondary" style="background:transparent; color:var(--geist-foreground); border:1px solid var(--accents-2);">Open</a>
+              <button class="btn-outline btn-secondary copy-btn" data-url="${device.url}" style="background:transparent; color:var(--geist-foreground); border:1px solid var(--accents-2);">Copy</button>
+            </div>
+          `;
+          
+          devicesContainer.appendChild(card);
+          
+          setTimeout(() => {
+            new QRCode(document.getElementById(`qr-${device.id}`), {
+              text: device.url,
+              width: 120,
+              height: 120,
+              colorDark : "#000000",
+              colorLight : "#ffffff",
+              correctLevel : QRCode.CorrectLevel.L
+            });
+          }, 50);
+        });
+        
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            navigator.clipboard.writeText(e.target.getAttribute('data-url')).then(() => {
+              const toast = document.getElementById('toast');
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            });
+          });
+        });
+      }
+
+      loadState();
+      
+      if (document.getElementById('globalFileId').value && document.getElementById('controllerNode').value) {
+        generateCards();
+      }
+
+      fetch('/api/network')
+        .then(res => res.json())
+        .then(data => {
+          const ipDisplay = document.getElementById('networkIpDisplay');
+          if (data.ips && data.ips.length > 0) {
+            ipDisplay.textContent = 'http://' + data.ips[0] + ':3000';
+          } else {
+            ipDisplay.textContent = 'Could not detect IP. Check terminal.';
+            ipDisplay.style.color = '#ef4444';
+          }
+        })
+        .catch(err => {
+          const ipDisplay = document.getElementById('networkIpDisplay');
+          ipDisplay.textContent = window.location.hostname !== 'localhost' ? 'http://' + window.location.hostname + ':3000' : 'Please restart server...';
+          ipDisplay.style.color = '#ef4444';
+        });
+    });
+  </script>
+</body>
+</html>

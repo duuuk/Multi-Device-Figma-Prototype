@@ -154,14 +154,15 @@
 
       // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
-      const fileId = params.get('file') || 'YOUR_FILE_ID';
-      const nodeId = params.get('node') || 'YOUR_NODE_ID';
-      const clientId = params.get('client') || 'YOUR_CLIENT_ID';
+      const fileId = params.get('file') || '';
+      const nodeId = params.get('node') || '';
+      const clientId = params.get('client') || '';
       const host = params.get('host') || 'multi-device-sync';
 
-      // Build and set the iframe URL
-      if (fileId !== 'YOUR_FILE_ID') {
-        const figmaUrl = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
+      // Build and set the iframe URL (only if a real ID is provided)
+      const isPlaceholder = (!fileId || fileId === 'YOUR_FILE_ID' || fileId === 'fileID');
+      if (!isPlaceholder && nodeId) {
+        const figmaUrl = `https://embed.figma.com/proto/${fileId}/?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
         iframe.src = figmaUrl;
       }
 
@@ -189,6 +190,8 @@
       socket.on("execute-action", (payload) => {
         if (!iframe.contentWindow) return;
         const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
+
+        // Use the verified Figma origin for maximum reliability
         iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
 

@@ -14,6 +14,20 @@ const PORT = process.env.PORT || 3000;
 // ── Serve static files from /public ──────────────────────────────────
 app.use(express.static("public"));
 
+// ── API endpoint for frontend to get local network IP ───────────────
+app.get("/api/network", (req, res) => {
+  const ips = [];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        ips.push(iface.address);
+      }
+    }
+  }
+  res.json({ ips });
+});
+
 // ── Socket.io routing ────────────────────────────────────────────────
 io.on("connection", (socket) => {
   const addr = socket.handshake.address;

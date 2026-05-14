@@ -97,10 +97,10 @@
       // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
 
-      // Values from your PROJECT_NAME prototype
-      const fileId = params.get('file') || 'YOUR_FILE_ID';
-      const nodeId = params.get('node') || 'YOUR_NODE_ID';
-      const clientId = params.get('client') || 'YOUR_CLIENT_ID';
+      // Values are passed via URL parameters dynamically from the setup dashboard
+      const fileId = params.get('file') || '';
+      const nodeId = params.get('node') || '';
+      const clientId = params.get('client') || '';
       const host = params.get('host') || 'multi-device-sync';
 
       // 'scale' allows you to zoom in slightly to hide edges (e.g., 1.05)
@@ -108,8 +108,8 @@
       iframe.style.transform = `scale(${zoom})`;
 
       // Build the URL
-      const figmaUrl = `https://embed.figma.com/proto/${fileId}/PROJECT_NAME?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
-      iframe.src = figmaUrl;
+      const figmaUrl = fileId && nodeId ? `https://embed.figma.com/proto/${fileId}/?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}` : '';
+      if (figmaUrl) iframe.src = figmaUrl;
 
       // ── 2. Socket Connection ──────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
