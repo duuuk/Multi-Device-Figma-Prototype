@@ -904,7 +904,7 @@
           const areas = row.querySelector('.device-areas') ? row.querySelector('.device-areas').value : '[]';
           
           if (node) {
-            let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}`;
+            let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}&id=target-${i}`;
             if (areas && areas !== '[]') {
                clientUrl += `&areas=${btoa(encodeURIComponent(areas))}`;
             }

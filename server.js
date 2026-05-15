@@ -36,13 +36,14 @@ io.on("connection", (socket) => {
   // Push live client count to all on connect
   io.emit("clients-count", io.engine.clientsCount);
 
-  // Controller sends 'trigger-action' → broadcast 'execute-action' to ALL
+  // Controller or Client sends 'trigger-action' → broadcast 'execute-action'
   socket.on("trigger-action", (payload) => {
     const dir = payload?.direction || "next";
-    console.log(`[→] trigger-action received from ${socket.id}: ${dir}`);
+    const target = payload?.target || "all";
+    console.log(`[→] trigger-action received from ${socket.id}: ${dir} (target: ${target})`);
 
-    // Broadcast to EVERY connected client (including the sender/controller)
-    io.emit("execute-action", { direction: dir });
+    // Broadcast to EVERY connected client
+    io.emit("execute-action", payload);
   });
 
   socket.on("disconnect", (reason) => {

@@ -118,6 +118,7 @@
       const nodeId = params.get('node') || '';
       const clientId = params.get('client') || '';
       const host = params.get('host') || 'multi-device-sync';
+      const deviceId = params.get('id') || 'unknown';
 
       // 'scale' allows you to zoom in slightly to hide edges (e.g., 1.05)
       const zoom = params.get('scale') || '1.14';
@@ -145,20 +146,12 @@
       });
 
       socket.on("execute-action", (payload) => {
+        if (payload.target && payload.target !== 'all' && payload.target !== deviceId) return;
+        
         if (!iframe.contentWindow) return;
-        const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
-        iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
-      });
-
-      // ── 3. Render Interactive Areas ──────────────────────────────────
-      const areasParam = params.get('areas');
-      if (areasParam) {
-         try {
-            const areasStr = decodeURIComponent(atob(areasParam));
-            const areas = JSON.parse(areasStr);
-            const container = document.getElementById('areas-container');
-            
-            function getEmbedUrl(rawUrl) {
+        
+        if (payload.direction === 'jump' && payload.url) {
+           function getEmbedUrl(rawUrl) {
                try {
                   const url = new URL(rawUrl);
                   const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
@@ -168,8 +161,21 @@
                   if (!pNodeId) return rawUrl;
                   return `https://embed.figma.com/proto/${pFileId}/?node-id=${pNodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
                } catch(e) { return rawUrl; }
-            }
+           }
+           iframe.src = getEmbedUrl(payload.url);
+        } else {
+           const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
+           iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
+        }
+      });
 
+      // ── 3. Render Interactive Areas ──────────────────────────────────
+      const areasParam = params.get('areas');
+      if (areasParam) {
+         try {
+            const areasStr = decodeURIComponent(atob(areasParam));
+            const areas = JSON.parse(areasStr);
+            const container = document.getElementById('areas-container');
             areas.forEach(area => {
                const div = document.createElement('div');
                div.className = 'client-area';
@@ -179,11 +185,11 @@
                div.style.height = area.h + '%';
                
                div.addEventListener('click', () => {
-                  if (area.action === 'next') socket.emit('trigger-action', { direction: 'next' });
-                  else if (area.action === 'prev') socket.emit('trigger-action', { direction: 'prev' });
-                  else if (area.action === 'jump' && area.url) {
-                     iframe.src = getEmbedUrl(area.url);
-                  }
+                  socket.emit('trigger-action', { 
+                     direction: area.action,
+                     url: area.url,
+                     target: area.target || 'all'
+                  });
                });
                
                container.appendChild(div);

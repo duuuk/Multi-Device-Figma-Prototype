@@ -3,11 +3,16 @@ let currentAreas = [];
 let dragArea = null;
 let dragType = null; // 'move' or 'resize'
 let startX, startY, startLeft, startTop, startWidth, startHeight;
+let allAvailableDevices = [];
 
 window.openAreaEditor = function(row) {
   currentEditingRow = row;
   const name = row.querySelector('.device-name').value;
   document.getElementById('editor-device-name').textContent = name;
+  
+  allAvailableDevices = Array.from(document.querySelectorAll('.device-row')).map((r, i) => {
+      return { id: `target-${i}`, name: r.querySelector('.device-name').value };
+  });
   
   const res = row.querySelector('.device-resolution').value;
   const ori = row.querySelector('.device-orientation').value;
@@ -54,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         id: 'area_' + Date.now(),
         x: 10, y: 10, w: 20, h: 20,
         action: 'next',
+        target: 'all',
         url: ''
       });
       renderCanvas();
@@ -114,6 +120,13 @@ function renderList() {
         <button type="button" class="btn-remove" onclick="removeArea(${index})">Delete</button>
       </div>
       <div class="form-group" style="margin-bottom: 8px;">
+        <label>Target Device</label>
+        <select class="area-target" data-index="${index}" style="width:100%; padding:8px; border-radius: var(--radius); background:var(--geist-bg); color:var(--geist-foreground); border:1px solid var(--accents-2);">
+           <option value="all" ${area.target==='all'?'selected':''}>All Devices</option>
+           ${allAvailableDevices.map(d => `<option value="${d.id}" ${area.target===d.id?'selected':''}>${d.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom: 8px;">
         <label>Action</label>
         <select class="area-action" data-index="${index}" style="width:100%; padding:8px; border-radius: var(--radius); background:var(--geist-bg); color:var(--geist-foreground); border:1px solid var(--accents-2);">
            <option value="next" ${area.action==='next'?'selected':''}>Next</option>
@@ -135,6 +148,13 @@ function renderList() {
        currentAreas[idx].action = e.target.value;
        renderList();
        renderCanvas();
+    });
+  });
+  
+  list.querySelectorAll('.area-target').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+       const idx = e.target.dataset.index;
+       currentAreas[idx].target = e.target.value;
     });
   });
   
