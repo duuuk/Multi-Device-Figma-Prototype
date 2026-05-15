@@ -74,6 +74,20 @@
     #status.hidden {
       opacity: 0;
     }
+
+    /* Interactive Areas */
+    #areas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      pointer-events: none;
+    }
+    .client-area {
+      position: absolute;
+      pointer-events: auto;
+      cursor: pointer;
+      /* background: rgba(255, 0, 0, 0.2); Uncomment to debug */
+    }
   </style>
 </head>
 
@@ -84,6 +98,8 @@
   <div id="iframe-container">
     <iframe id="figma-frame" allowfullscreen></iframe>
   </div>
+
+  <div id="areas-container"></div>
 
   <script src="/socket.io/socket.io.js"></script>
 
@@ -133,6 +149,47 @@
         const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
         iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
+
+      // ── 3. Render Interactive Areas ──────────────────────────────────
+      const areasParam = params.get('areas');
+      if (areasParam) {
+         try {
+            const areasStr = decodeURIComponent(atob(areasParam));
+            const areas = JSON.parse(areasStr);
+            const container = document.getElementById('areas-container');
+            
+            function getEmbedUrl(rawUrl) {
+               try {
+                  const url = new URL(rawUrl);
+                  const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
+                  let pFileId = fileMatch ? fileMatch[1] : fileId;
+                  let pNodeId = url.searchParams.get('node-id');
+                  if (pNodeId) pNodeId = pNodeId.replace('-', ':').replace('%3A', ':');
+                  if (!pNodeId) return rawUrl;
+                  return `https://embed.figma.com/proto/${pFileId}/?node-id=${pNodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
+               } catch(e) { return rawUrl; }
+            }
+
+            areas.forEach(area => {
+               const div = document.createElement('div');
+               div.className = 'client-area';
+               div.style.left = area.x + '%';
+               div.style.top = area.y + '%';
+               div.style.width = area.w + '%';
+               div.style.height = area.h + '%';
+               
+               div.addEventListener('click', () => {
+                  if (area.action === 'next') socket.emit('trigger-action', { direction: 'next' });
+                  else if (area.action === 'prev') socket.emit('trigger-action', { direction: 'prev' });
+                  else if (area.action === 'jump' && area.url) {
+                     iframe.src = getEmbedUrl(area.url);
+                  }
+               });
+               
+               container.appendChild(div);
+            });
+         } catch(e) { console.error("Failed to parse areas:", e); }
+      }
     })();
   </script>
 </body>

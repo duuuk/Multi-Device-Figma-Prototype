@@ -471,6 +471,39 @@
       opacity: 1;
       transform: translateY(0);
     }
+
+    /* Area Editor Styles */
+    .tap-area {
+      position: absolute;
+      background: rgba(74, 222, 128, 0.4);
+      border: 2px solid #4ade80;
+      border-radius: 4px;
+      cursor: move;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: bold;
+      font-size: 12px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      user-select: none;
+    }
+    .tap-area.active {
+      background: rgba(96, 165, 250, 0.5);
+      border-color: #60a5fa;
+      z-index: 10;
+    }
+    .tap-area .resize-handle {
+      position: absolute;
+      bottom: -6px;
+      right: -6px;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 1px solid #000;
+      cursor: nwse-resize;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
@@ -617,6 +650,26 @@
       </div>
     </div>
 
+    <!-- Area Editor Modal -->
+    <div class="modal" id="modal-areas" style="display: none; max-width: 900px; width: 95%;">
+      <div class="modal-header">
+        <h3>Edit Interactive Areas: <span id="editor-device-name"></span></h3>
+        <button class="modal-close" onclick="closeModals()">&times;</button>
+      </div>
+      <div class="modal-content" style="display: flex; gap: 24px; padding: 24px;">
+        <div style="flex: 2; background: var(--accents-1); border: 1px solid var(--accents-2); border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden;">
+          <div id="editor-canvas" style="position: relative; background: #222; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; aspect-ratio: 2360 / 1640;">
+            <!-- Areas injected here -->
+          </div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <button type="button" class="btn" id="btnAddArea" style="margin-bottom: 16px;">+ Add Tap Area</button>
+          <div id="areas-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;"></div>
+          <button type="button" class="btn btn-outline" id="btnSaveAreas" style="margin-top: 16px;">Save Areas</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <template id="device-template">
@@ -638,6 +691,35 @@
           <label>Scale Factor</label>
           <input type="text" class="device-scale" value="1.14">
         </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Resolution</label>
+          <select class="device-resolution">
+            <option value="2360x1640">iPad Air (2360x1640)</option>
+            <option value="2388x1668">iPad Pro 11" (2388x1668)</option>
+            <option value="2732x2048">iPad Pro 12.9" (2732x2048)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Orientation</label>
+          <select class="device-orientation">
+            <option value="landscape">Landscape</option>
+            <option value="portrait">Portrait</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group custom-res-group" style="display: none;">
+        <label>Custom Resolution (W x H)</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="number" class="custom-w" placeholder="Width" style="width: 50%;">
+          <input type="number" class="custom-h" placeholder="Height" style="width: 50%;">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <button type="button" class="btn btn-outline btn-edit-areas" style="padding: 6px 12px; font-size: 13px;">Configure Tap Areas</button>
+        <input type="hidden" class="device-areas" value="[]">
       </div>
     </div>
   </template>
@@ -705,6 +787,27 @@
         row.querySelector('.device-url').value = deviceData.url || '';
         row.querySelector('.device-node').value = deviceData.node || '';
         row.querySelector('.device-scale').value = deviceData.scale || '1.14';
+        
+        if(row.querySelector('.device-resolution')) row.querySelector('.device-resolution').value = deviceData.resolution || '2360x1640';
+        if(row.querySelector('.device-orientation')) row.querySelector('.device-orientation').value = deviceData.orientation || 'landscape';
+        if(row.querySelector('.custom-w')) row.querySelector('.custom-w').value = deviceData.custom_w || '';
+        if(row.querySelector('.custom-h')) row.querySelector('.custom-h').value = deviceData.custom_h || '';
+        if(row.querySelector('.device-areas')) row.querySelector('.device-areas').value = deviceData.areas || '[]';
+
+        const resSelect = row.querySelector('.device-resolution');
+        const customGroup = row.querySelector('.custom-res-group');
+        if(resSelect && customGroup) {
+          const toggleCustom = () => { customGroup.style.display = resSelect.value === 'custom' ? 'block' : 'none'; };
+          resSelect.addEventListener('change', toggleCustom);
+          toggleCustom();
+        }
+
+        const btnEditAreas = row.querySelector('.btn-edit-areas');
+        if(btnEditAreas) {
+           btnEditAreas.addEventListener('click', () => {
+              if (window.openAreaEditor) window.openAreaEditor(row);
+           });
+        }
 
         row.querySelector('.btn-remove').addEventListener('click', () => {
           row.remove();
@@ -732,7 +835,12 @@
             name: row.querySelector('.device-name').value,
             url: row.querySelector('.device-url').value,
             node: row.querySelector('.device-node').value,
-            scale: row.querySelector('.device-scale').value
+            scale: row.querySelector('.device-scale').value,
+            resolution: row.querySelector('.device-resolution') ? row.querySelector('.device-resolution').value : '2360x1640',
+            orientation: row.querySelector('.device-orientation') ? row.querySelector('.device-orientation').value : 'landscape',
+            custom_w: row.querySelector('.custom-w') ? row.querySelector('.custom-w').value : '',
+            custom_h: row.querySelector('.custom-h') ? row.querySelector('.custom-h').value : '',
+            areas: row.querySelector('.device-areas') ? row.querySelector('.device-areas').value : '[]'
           });
         });
 
@@ -793,13 +901,18 @@
           const name = row.querySelector('.device-name').value;
           const node = row.querySelector('.device-node').value;
           const scale = row.querySelector('.device-scale').value;
+          const areas = row.querySelector('.device-areas') ? row.querySelector('.device-areas').value : '[]';
           
           if (node) {
+            let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}`;
+            if (areas && areas !== '[]') {
+               clientUrl += `&areas=${btoa(encodeURIComponent(areas))}`;
+            }
             cardsData.push({
               id: `target-${i}`,
               name: name,
               desc: `Scale: ${scale}`,
-              url: `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}`
+              url: clientUrl
             });
           }
         });
@@ -867,5 +980,6 @@
         });
     });
   </script>
+  <script src="editor.js"></script>
 </body>
 </html>
