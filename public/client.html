@@ -15,6 +15,7 @@
     .figma-frame {
       border: none; width: 100vw; height: 100vh;
       position: absolute; top: 50%; left: 50%; transform-origin: center center;
+      background: #000;
     }
     .figma-frame.hidden-frame { visibility: hidden; pointer-events: none; }
     .figma-frame.active-frame { visibility: visible; pointer-events: auto; }
@@ -119,8 +120,8 @@
           // Load fresh so animations play from start
           entry.iframe.src = entry.url;
           entry.loaded = true;
-          // Old frame stays visible until new one loads
-          entry.iframe.onload = doSwap;
+          // Old frame stays visible until new one loads + renders
+          entry.iframe.onload = () => setTimeout(doSwap, 200);
         }
       }
 
