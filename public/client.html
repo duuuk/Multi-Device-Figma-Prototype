@@ -115,7 +115,7 @@
               showStatus(`Jumping to: ${targetNodeId}`);
               iframe.contentWindow.postMessage({
                 type: 'NAVIGATE_TO_FRAME_AND_CLOSE_OVERLAYS',
-                data: { nodeId: targetNodeId }
+                data: { node_id: targetNodeId }
               }, "https://www.figma.com");
             } else {
               showStatus("Error: Node ID not found in URL", "disconnected");
