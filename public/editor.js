@@ -156,6 +156,7 @@ function renderList() {
           <div style="flex:1">
             <input type="text" class="mapping-url" data-area="${index}" data-mapping="${mi}" value="${m.frameUrl || ''}" placeholder="Figma frame URL..." style="font-size:13px; ${selStyle}">
           </div>
+          <button type="button" class="btn btn-outline" onclick="loadTargetScreen(${index}, ${mi})" style="flex:0 0 auto;padding:4px 8px;font-size:12px;background:var(--accents-1);color:var(--geist-foreground);">Edit Target →</button>
           <button type="button" class="btn-remove" onclick="removeMapping(${index},${mi})" style="flex:0 0 auto;padding:4px 8px">✕</button>
         </div>
       `).join('');
@@ -222,6 +223,13 @@ window.addMapping = function(areaIndex) {
 window.removeMapping = function(areaIndex, mappingIndex) {
   currentAreas[areaIndex].frameMappings.splice(mappingIndex, 1);
   renderList(); renderCanvas();
+};
+
+window.loadTargetScreen = function(areaIndex, mappingIndex) {
+  const input = document.querySelector(`.mapping-url[data-area="${areaIndex}"][data-mapping="${mappingIndex}"]`);
+  if (!input || !input.value) return alert('Please paste a target Figma URL first.');
+  document.getElementById('editor-frame-url').value = input.value;
+  document.getElementById('btnLoadEditorFrame').click();
 };
 
 window.removeArea = function(i) { currentAreas.splice(i, 1); renderCanvas(); renderList(); };
