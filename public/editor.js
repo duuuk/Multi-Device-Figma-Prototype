@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       editorCurrentNodeId = nodeId;
-      const embedUrl = `https://embed.figma.com/proto/${fileId}/?node-id=${nodeId}&scaling=scale-down&hide-ui=1&client-id=${clientId}`;
+      const embedUrl = `https://embed.figma.com/proto/${fileId}/?node-id=${nodeId}&scaling=scale-down&hide-ui=1&client-id=${clientId}&embed-host=${encodeURIComponent(window.location.host)}`;
       document.getElementById('editor-figma-preview').src = embedUrl;
       
       // Fetch existing areas from server

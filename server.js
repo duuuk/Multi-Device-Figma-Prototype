@@ -10,6 +10,7 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
+const nodeConfigs = {};
 
 // ── Serve static files from /public ──────────────────────────────────
 app.use(express.static("public"));
