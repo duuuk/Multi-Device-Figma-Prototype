@@ -2,17 +2,7 @@
 
 A synchronization tool for high-fidelity physical installations (museums, showrooms, automotive mockups) using multiple iPads and a master controller. 
 
-The main purpose of this tool is to run a prototype on multiple devices and sync them based on the input from the controller. Currently, this relies on left and right navigation broadcasts. Future updates will add hotspot capabilities (which might kill Smart Animate, but looking into it).
-
----
-
-## 📖 The Architecture
-
-This tool uses the **Figma Embed API** and **WebSockets** to synchronize the state across multiple devices without reloading the page.
-
-- **Master Controller**: A laptop or tablet that intercepts keystrokes and broadcasts them.
-- **iPad Clients**: "Dumb" terminals that listen for broadcasts and use `postMessage` to "talk" to the Figma iframe internally.
-- **Node.js Server**: The central hub that relays messages between all connected devices.
+This tool uses the **Figma Embed API** and **WebSockets** to synchronize state across multiple devices. It allows you to create completely custom hardware prototypes where a single tap on an iPad can instantly drive transitions across an entire array of physical screens.
 
 ---
 
@@ -47,7 +37,7 @@ Figma requires you to register an App to use the Embed API securely. The dashboa
 4. Copy the generated **Client ID** and paste it into the dashboard.
 
 ### 2. Connect Your Master Controller
-The Master Controller is the device (usually a laptop) that you will use to press the arrow keys and drive the presentation.
+The Master Controller is an optional device (usually a laptop) that you will use to press the arrow keys and drive the presentation.
 1. In Figma, open the prototype flow you want to use.
 2. Click **Share prototype** and copy the link.
 3. Paste that link into the **Controller Figma URL** field on the dashboard. The File ID and Node ID will be extracted automatically!
@@ -55,14 +45,44 @@ The Master Controller is the device (usually a laptop) that you will use to pres
 ### 3. Add Target Devices (iPads/Screens)
 You can dynamically add as many target screens as you need.
 1. Click **+ Add Target Device** for each screen (e.g., Left Monitor, Center Console, Right Monitor).
-2. Paste the exact Figma prototype URL you want that specific screen to display. 
-   *(Note: You can paste flow URLs from the same Figma file, or completely different prototype links—the tool will parse them instantly.)*
+2. Paste the exact Figma prototype URL you want that specific screen to start on. 
 3. Adjust the **Scale Factor** (default `1.14`) to perfectly over-scan and hide Figma's default UI edges on your specific physical screens.
 
 ### 4. Deploy and Sync
 Once configured, click **Deploy Links**. The dashboard will instantly generate standalone URLs and **QR Codes** for each device.
 - Scan the QR code with your iPads to instantly open their specific slice of the prototype.
 - Open the Master Controller link on your laptop and use the **Left/Right Arrow Keys** to control all devices in unison!
+
+---
+
+## 🗺️ Visual Tap Area Editor & Continuous Flow (NEW)
+
+This tool now supports drawing invisible tap areas directly over your Figma designs to create a continuous, multi-screen, multi-device flow without writing code.
+
+1. **Open the Editor**: From the dashboard, click the **Visual Tap Area Editor** button.
+2. **Draw Hotspots**: Paste a Figma URL, click Load Screen, and then click **+ Add Tap Area**. Drag and resize the green box over your desired button.
+3. **Configure Actions**:
+   - **Next/Prev Frame**: Triggers standard linear navigation.
+   - **Jump to Target Screen**: Allows you to branch your flow. For each device (e.g., Left iPad, Right iPad), you can assign a completely different target Figma URL. When the hotspot is tapped, all devices instantly jump to their respective targets.
+4. **Rapid Chaining**: Click the **Edit Target →** button next to a URL to instantly load that new screen into the editor so you can continuously chain flows together seamlessly.
+5. **Persistent Storage**: Click **Save Areas to Server**. Everything is saved to `configs.json` on your hard drive, so your prototype will survive server restarts and browser reloads!
+
+---
+
+## 📋 Changelog
+
+### v2.0 - Dynamic Flow Engine & Visual Editor
+- **Visual Tap Area Editor**: Replaced legacy setup with a visual, drag-and-drop hotspot editor overlaid on live Figma iframes.
+- **Continuous Flow Architecture**: Devices now dynamically and eagerly fetch new tap areas as they navigate through Figma flows, enabling infinite prototype chaining.
+- **Persistent Disk Storage**: Server state is automatically saved to `configs.json` to survive crashes and restarts without requiring new modes.
+- **Responsive Touch Optimization**: Upgraded event listeners from `click` to `touchstart` to eliminate Safari's default 300ms tap delay on iPad hardware.
+- **Rapid Chaining Workflow**: Added UI tools to instantly pivot the visual editor to target screens.
+
+### v1.0 - Core Sync Engine
+- Initial release featuring WebSocket-based real-time synchronization.
+- Master Controller keyboard event broadcasting.
+- Setup Dashboard with local storage persistence, QR code generation, and local network IP discovery.
+- Figma Embed API integration for native Smart Animate support across iPads.
 
 ---
 
