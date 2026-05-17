@@ -873,10 +873,19 @@
         generateCards();
       });
 
-      function generateCards() {
+      async function generateCards() {
         devicesContainer.innerHTML = '';
         
-        const hostUrl = `${window.location.protocol}//${window.location.host}`;
+        // Use network IP instead of localhost so QR codes work on iPads
+        let hostUrl = `${window.location.protocol}//${window.location.host}`;
+        try {
+          const res = await fetch('/api/network');
+          const data = await res.json();
+          if (data.ips && data.ips.length > 0) {
+            hostUrl = `${window.location.protocol}//${data.ips[0]}:${window.location.port || '3000'}`;
+          }
+        } catch(e) {}
+        
         const clientId = document.getElementById('clientId').value;
         const globalFileId = document.getElementById('globalFileId').value;
         

@@ -75,30 +75,47 @@
         } catch (e) { return { fileId, nodeId: null }; }
       }
 
-      // ── Iframe Pool ────────────────────────────────────────────────
+      // ── Iframe Pool (lazy loading) ─────────────────────────────────
+      // Iframes are registered with their URL but NOT loaded until needed.
+      // This ensures Figma animations play fresh when the frame becomes visible.
       const iframePool = {};
       let activeFrameKey = 'primary';
 
-      function createPoolIframe(key, figmaUrl) {
-        if (iframePool[key]) return; // already exists
+      function createPoolIframe(key, figmaUrl, loadNow) {
+        if (iframePool[key]) return;
         const iframe = document.createElement('iframe');
         iframe.className = 'figma-frame hidden-frame';
         iframe.allowFullscreen = true;
         iframe.style.transform = `translate(-50%, -50%) scale(${zoom})`;
-        iframe.src = figmaUrl;
+        if (loadNow) iframe.src = figmaUrl;
         container.appendChild(iframe);
-        iframePool[key] = { iframe };
+        iframePool[key] = { iframe, url: figmaUrl, loaded: !!loadNow };
       }
 
       function switchToFrame(key) {
         if (!iframePool[key]) return;
-        Object.values(iframePool).forEach(e => {
-          e.iframe.classList.remove('active-frame');
-          e.iframe.classList.add('hidden-frame');
-        });
-        iframePool[key].iframe.classList.remove('hidden-frame');
-        iframePool[key].iframe.classList.add('active-frame');
-        activeFrameKey = key;
+        if (key === activeFrameKey) return;
+        const entry = iframePool[key];
+
+        // Load the iframe fresh (so animations play from start)
+        entry.iframe.src = entry.url;
+        entry.loaded = true;
+
+        // Wait for load, then swap — old frame stays visible during load
+        entry.iframe.onload = () => {
+          Object.entries(iframePool).forEach(([k, e]) => {
+            if (k === key) {
+              e.iframe.classList.remove('hidden-frame');
+              e.iframe.classList.add('active-frame');
+            } else {
+              e.iframe.classList.remove('active-frame');
+              e.iframe.classList.add('hidden-frame');
+              // Unload non-active iframes to free memory & reset their state
+              if (k !== 'primary') { e.iframe.src = ''; e.loaded = false; }
+            }
+          });
+          activeFrameKey = key;
+        };
       }
 
       function frameKeyFromUrl(rawUrl) {
@@ -106,16 +123,16 @@
         return p.nodeId ? 'frame_' + p.fileId + '_' + p.nodeId : null;
       }
 
-      function preloadUrl(rawUrl) {
+      function registerUrl(rawUrl) {
         const p = parseNodeFromUrl(rawUrl);
         if (!p.nodeId) return;
         const key = 'frame_' + p.fileId + '_' + p.nodeId;
-        createPoolIframe(key, buildEmbedUrl(p.fileId, p.nodeId));
+        createPoolIframe(key, buildEmbedUrl(p.fileId, p.nodeId), false);
       }
 
       // ── Create primary iframe ──────────────────────────────────────
       if (fileId && nodeId) {
-        createPoolIframe('primary', buildEmbedUrl(fileId, nodeId));
+        createPoolIframe('primary', buildEmbedUrl(fileId, nodeId), true);
         switchToFrame('primary');
       }
 
@@ -124,7 +141,7 @@
       if (preloadParam) {
         try {
           const urls = JSON.parse(decodeURIComponent(atob(preloadParam)));
-          urls.forEach(url => preloadUrl(url));
+          urls.forEach(url => registerUrl(url));
         } catch (e) { console.error("Failed to parse preload:", e); }
       }
 
@@ -136,11 +153,11 @@
         catch (e) { console.error("Failed to parse areas:", e); }
       }
 
-      // Also pre-load frames from this device's own areas' frameMappings
+      // Register frames from this device's own areas' frameMappings (lazy, no src set)
       areas.forEach(a => {
         if (a.frameMappings) {
           a.frameMappings.forEach(m => {
-            if ((m.device === 'self' || m.device === deviceId) && m.frameUrl) preloadUrl(m.frameUrl);
+            if ((m.device === 'self' || m.device === deviceId) && m.frameUrl) registerUrl(m.frameUrl);
           });
         }
       });
@@ -169,8 +186,8 @@
             if (key && iframePool[key]) {
               switchToFrame(key);
             } else if (key) {
-              preloadUrl(myMapping.frameUrl);
-              setTimeout(() => switchToFrame(key), 150);
+              registerUrl(myMapping.frameUrl);
+              switchToFrame(key);
             }
           }
           return;
