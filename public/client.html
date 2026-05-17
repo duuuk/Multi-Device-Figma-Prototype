@@ -176,6 +176,10 @@
                 type: 'NAVIGATE_TO_FRAME_AND_CLOSE_OVERLAYS',
                 data: { nodeId: targetNodeId, node_id: targetNodeId }
               }, "https://www.figma.com");
+              
+              // Optimistically fetch the next tap areas instead of waiting for the event
+              currentFigmaNodeId = targetNodeId;
+              fetchAndRenderAreas(targetNodeId);
             } else {
               showStatus("Error: Node ID not found in URL", "disconnected");
             }

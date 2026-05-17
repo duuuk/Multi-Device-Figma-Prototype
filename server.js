@@ -2,6 +2,8 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const os = require("os");
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -10,7 +12,16 @@ const io = new Server(server, {
 });
 
 const PORT = process.env.PORT || 3000;
-const nodeConfigs = {};
+const CONFIG_FILE = path.join(__dirname, "configs.json");
+
+let nodeConfigs = {};
+if (fs.existsSync(CONFIG_FILE)) {
+  try {
+    nodeConfigs = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+  } catch (e) {
+    console.error("Error reading configs.json", e);
+  }
+}
 
 // ── Serve static files from /public ──────────────────────────────────
 app.use(express.static("public"));
@@ -42,6 +53,7 @@ io.on("connection", (socket) => {
   socket.on("save-config", ({ nodeId, areas }) => {
     if (nodeId) {
       nodeConfigs[nodeId] = areas;
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(nodeConfigs, null, 2));
       console.log(`[+] Saved ${areas.length} areas for node ${nodeId}`);
       // Broadcast to any clients currently on this node
       io.emit("config-updated", { nodeId, areas });
