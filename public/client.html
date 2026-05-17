@@ -12,12 +12,10 @@
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center; overflow: hidden;
     }
-    .figma-frame {
+    #figma-frame {
       border: none; width: 100vw; height: 100vh;
       position: absolute; top: 50%; left: 50%; transform-origin: center center;
-      display: none;
     }
-    .figma-frame.active { display: block; }
 
     #status {
       position: fixed; top: env(safe-area-inset-top, 12px); right: env(safe-area-inset-right, 12px);
@@ -40,7 +38,9 @@
 </head>
 <body>
   <div id="status" class="disconnected">Connecting…</div>
-  <div id="iframe-container"></div>
+  <div id="iframe-container">
+    <iframe id="figma-frame" allowfullscreen></iframe>
+  </div>
   <div id="areas-container"></div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -48,7 +48,7 @@
     (() => {
       "use strict";
 
-      const container = document.getElementById("iframe-container");
+      const iframe = document.getElementById("figma-frame");
       const status = document.getElementById("status");
       const params = new URLSearchParams(window.location.search);
 
@@ -59,77 +59,24 @@
       const deviceId = params.get('id') || 'unknown';
       const zoom = params.get('scale') || '1.14';
 
+      iframe.style.transform = `translate(-50%, -50%) scale(${zoom})`;
+
       function buildEmbedUrl(fId, nId) {
         return `https://embed.figma.com/proto/${fId}/?node-id=${nId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
       }
 
-      function parseNodeFromUrl(rawUrl) {
+      function parseNodeIdFromUrl(rawUrl) {
         try {
           const url = new URL(rawUrl);
-          const m = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
-          let pFileId = m ? m[1] : fileId;
           let pNodeId = url.searchParams.get('node-id');
-          if (pNodeId) pNodeId = pNodeId.replace('-', ':').replace('%3A', ':');
-          return { fileId: pFileId, nodeId: pNodeId };
-        } catch (e) { return { fileId, nodeId: null }; }
-      }
-
-      function embedUrlFromRaw(rawUrl) {
-        const p = parseNodeFromUrl(rawUrl);
-        return p.nodeId ? buildEmbedUrl(p.fileId, p.nodeId) : null;
-      }
-
-      // ── Iframe Pool (display:none pre-loading) ─────────────────────
-      // Safari/iPad freezes rendering for display:none iframes.
-      // Animations won't play until the iframe becomes display:block.
-      const pool = {};
-      let activeKey = null;
-
-      function makeIframe(key, embedUrl) {
-        if (pool[key]) return;
-        const iframe = document.createElement('iframe');
-        iframe.className = 'figma-frame';
-        iframe.allowFullscreen = true;
-        iframe.style.transform = `translate(-50%, -50%) scale(${zoom})`;
-        iframe.src = embedUrl;
-        container.appendChild(iframe);
-        pool[key] = iframe;
-      }
-
-      function switchTo(key) {
-        if (!pool[key] || key === activeKey) return;
-        // Hide all, show target
-        Object.entries(pool).forEach(([k, iframe]) => {
-          if (k === key) {
-            iframe.classList.add('active');
-          } else {
-            iframe.classList.remove('active');
-          }
-        });
-        activeKey = key;
-      }
-
-      function keyFromUrl(rawUrl) {
-        const p = parseNodeFromUrl(rawUrl);
-        return p.nodeId ? p.fileId + '_' + p.nodeId : null;
-      }
-
-      // ── Create primary iframe ──────────────────────────────────────
-      if (fileId && nodeId) {
-        makeIframe('primary', buildEmbedUrl(fileId, nodeId));
-        switchTo('primary');
-      }
-
-      // ── Pre-load from preload param ────────────────────────────────
-      const preloadParam = params.get('preload');
-      if (preloadParam) {
-        try {
-          JSON.parse(decodeURIComponent(atob(preloadParam))).forEach(url => {
-            const key = keyFromUrl(url);
-            const embedUrl = embedUrlFromRaw(url);
-            if (key && embedUrl) makeIframe(key, embedUrl);
-          });
+          if (pNodeId) return pNodeId.replace('-', ':').replace('%3A', ':');
         } catch (e) {}
+        return null;
+      }
+
+      // ── Initial Load ───────────────────────────────────────────────
+      if (fileId && nodeId) {
+        iframe.src = buildEmbedUrl(fileId, nodeId);
       }
 
       // ── Parse areas ────────────────────────────────────────────────
@@ -137,21 +84,8 @@
       const areasParam = params.get('areas');
       if (areasParam) {
         try { areas = JSON.parse(decodeURIComponent(atob(areasParam))); }
-        catch (e) {}
+        catch (e) { console.error("Failed to parse areas:", e); }
       }
-
-      // Pre-load self-targeted frames from areas
-      areas.forEach(a => {
-        if (a.frameMappings) {
-          a.frameMappings.forEach(m => {
-            if ((m.device === 'self' || m.device === deviceId) && m.frameUrl) {
-              const key = keyFromUrl(m.frameUrl);
-              const embedUrl = embedUrlFromRaw(m.frameUrl);
-              if (key && embedUrl) makeIframe(key, embedUrl);
-            }
-          });
-        }
-      });
 
       // ── Socket ─────────────────────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
@@ -168,29 +102,29 @@
       });
 
       socket.on("execute-action", (payload) => {
+        if (!iframe.contentWindow) return;
+
+        // ── Jump using native Figma postMessage ──────────────────────
         if (payload.direction === 'jump' && payload.frameMappings) {
           const myMapping = payload.frameMappings.find(m => m.device === deviceId)
                          || payload.frameMappings.find(m => m.device === 'all');
+          
           if (myMapping && myMapping.frameUrl) {
-            const key = keyFromUrl(myMapping.frameUrl);
-            if (key) {
-              if (!pool[key]) {
-                const embedUrl = embedUrlFromRaw(myMapping.frameUrl);
-                if (embedUrl) makeIframe(key, embedUrl);
-              }
-              switchTo(key);
+            const targetNodeId = parseNodeIdFromUrl(myMapping.frameUrl);
+            if (targetNodeId) {
+              iframe.contentWindow.postMessage({
+                type: 'NAVIGATE_TO_FRAME_AND_CLOSE_OVERLAYS',
+                data: { nodeId: targetNodeId }
+              }, "https://www.figma.com");
             }
           }
           return;
         }
 
-        // Standard next/prev
+        // ── Standard next/prev ───────────────────────────────────────
         if (payload.target && payload.target !== 'all' && payload.target !== deviceId) return;
-        const active = activeKey ? pool[activeKey] : null;
-        if (active && active.contentWindow) {
-          const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
-          active.contentWindow.postMessage({ type }, "https://www.figma.com");
-        }
+        const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
+        iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
 
       // ── Render tap area overlays ───────────────────────────────────
