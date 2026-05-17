@@ -79,14 +79,6 @@
         iframe.src = buildEmbedUrl(fileId, nodeId);
       }
 
-      // ── Parse areas ────────────────────────────────────────────────
-      let areas = [];
-      const areasParam = params.get('areas');
-      if (areasParam) {
-        try { areas = JSON.parse(decodeURIComponent(atob(areasParam))); }
-        catch (e) { console.error("Failed to parse areas:", e); }
-      }
-
       // ── Socket ─────────────────────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
@@ -98,9 +90,76 @@
         hideTimer = setTimeout(() => status.classList.add("hidden"), 3000);
       }
 
-      socket.on("connect", () => showStatus("Connected"));
+      socket.on("connect", () => {
+        showStatus("Connected");
+        // Fetch areas for initial node
+        if (nodeId) fetchAndRenderAreas(nodeId);
+      });
       socket.on("disconnect", () => showStatus("Disconnected", "disconnected"));
 
+      // ── Dynamic Tap Areas ──────────────────────────────────────────
+      const ac = document.getElementById('areas-container');
+      
+      function renderAreas(areasList) {
+        ac.innerHTML = '';
+        if (!areasList || !areasList.length) return;
+        
+        areasList.forEach(area => {
+          const div = document.createElement('div');
+          div.className = 'client-area';
+          div.style.left = area.x + '%'; div.style.top = area.y + '%';
+          div.style.width = area.w + '%'; div.style.height = area.h + '%';
+
+          const handler = (e) => {
+            e.preventDefault();
+            // Visual feedback
+            div.style.background = 'rgba(255, 255, 255, 0.15)';
+            setTimeout(() => div.style.background = '', 200);
+
+            if (area.action === 'jump' && area.frameMappings) {
+              const resolved = area.frameMappings
+                .filter(m => m.frameUrl)
+                .map(m => ({ device: m.device === 'self' ? deviceId : m.device, frameUrl: m.frameUrl }));
+              socket.emit('trigger-action', { direction: 'jump', frameMappings: resolved });
+            } else {
+              socket.emit('trigger-action', { direction: area.action, target: area.target || 'all' });
+            }
+          };
+
+          div.addEventListener('click', handler);
+          div.addEventListener('touchstart', handler, { passive: false });
+          ac.appendChild(div);
+        });
+      }
+
+      function fetchAndRenderAreas(targetNodeId) {
+        socket.emit("get-config", targetNodeId, (areas) => {
+          renderAreas(areas);
+        });
+      }
+
+      // Listen for updates from dashboard if we are on the edited node
+      socket.on("config-updated", ({ nodeId: updatedNodeId, areas }) => {
+        // If we are currently displaying this node, update areas
+        if (currentFigmaNodeId === updatedNodeId) {
+          renderAreas(areas);
+        }
+      });
+
+      let currentFigmaNodeId = nodeId;
+
+      // Listen to native Figma navigation events to load the correct tap areas for the new screen
+      window.addEventListener("message", (e) => {
+        if (e.origin && e.origin.includes('figma.com') && e.data) {
+          try {
+            const payload = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+            if (payload && payload.type === 'PRESENTED_NODE_CHANGED' && payload.data && payload.data.node_id) {
+              currentFigmaNodeId = payload.data.node_id;
+              fetchAndRenderAreas(currentFigmaNodeId);
+            }
+          } catch(err) {}
+        }
+      });
       socket.on("execute-action", (payload) => {
         if (!iframe.contentWindow) return;
 
@@ -130,32 +189,7 @@
         iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
 
-      // ── Render tap area overlays ───────────────────────────────────
-      if (areas.length > 0) {
-        const ac = document.getElementById('areas-container');
-        areas.forEach(area => {
-          const div = document.createElement('div');
-          div.className = 'client-area';
-          div.style.left = area.x + '%'; div.style.top = area.y + '%';
-          div.style.width = area.w + '%'; div.style.height = area.h + '%';
-
-          const handler = (e) => {
-            e.preventDefault();
-            if (area.action === 'jump' && area.frameMappings) {
-              const resolved = area.frameMappings
-                .filter(m => m.frameUrl)
-                .map(m => ({ device: m.device === 'self' ? deviceId : m.device, frameUrl: m.frameUrl }));
-              socket.emit('trigger-action', { direction: 'jump', frameMappings: resolved });
-            } else {
-              socket.emit('trigger-action', { direction: area.action, target: area.target || 'all' });
-            }
-          };
-
-          div.addEventListener('click', handler);
-          div.addEventListener('touchend', handler);
-          ac.appendChild(div);
-        });
-      }
+      });
     })();
   </script>
 </body>

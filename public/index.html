@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
 
   <style>
     :root {
@@ -584,6 +585,9 @@
           <button type="button" id="addDeviceBtn" class="btn btn-outline" style="margin-bottom: 24px;">
             + Add Target Device
           </button>
+          <button type="button" class="btn btn-secondary" style="margin-bottom: 24px; margin-left: 12px; background: var(--accents-2); border: 1px solid var(--accents-3);" onclick="window.openGlobalAreaEditor()">
+            Visual Tap Area Editor
+          </button>
 
           <button type="button" id="deployBtn" class="btn">Deploy Links</button>
         </div>
@@ -651,21 +655,33 @@
     </div>
 
     <!-- Area Editor Modal -->
-    <div class="modal" id="modal-areas" style="display: none; max-width: 900px; width: 95%;">
+    <div class="modal" id="modal-areas" style="display: none; max-width: 1200px; width: 95%;">
       <div class="modal-header">
-        <h3>Edit Interactive Areas: <span id="editor-device-name"></span></h3>
+        <h3>Edit Interactive Areas</h3>
         <button class="modal-close" onclick="closeModals()">&times;</button>
       </div>
-      <div class="modal-content" style="display: flex; gap: 24px; padding: 24px;">
-        <div style="flex: 2; background: var(--accents-1); border: 1px solid var(--accents-2); border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden;">
-          <div id="editor-canvas" style="position: relative; background: #222; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; aspect-ratio: 2360 / 1640;">
-            <!-- Areas injected here -->
+      <div class="modal-content" style="display: flex; flex-direction: column; gap: 16px; padding: 24px;">
+        
+        <div style="display: flex; gap: 12px; align-items: center; background: var(--accents-1); padding: 12px; border-radius: 8px; border: 1px solid var(--accents-2);">
+          <div style="flex: 1;">
+            <label style="font-size: 12px; color: var(--accents-5); display: block; margin-bottom: 4px;">Figma Frame URL to Edit</label>
+            <input type="url" id="editor-frame-url" class="auto-parse-url" placeholder="Paste Figma URL here to see the screen and edit its tap areas..." style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--accents-2); background: var(--geist-bg); color: var(--geist-foreground);">
           </div>
+          <button type="button" class="btn" id="btnLoadEditorFrame" style="margin-top: 20px;">Load Screen</button>
         </div>
-        <div style="flex: 1; display: flex; flex-direction: column;">
-          <button type="button" class="btn" id="btnAddArea" style="margin-bottom: 16px;">+ Add Tap Area</button>
-          <div id="areas-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;"></div>
-          <button type="button" class="btn btn-outline" id="btnSaveAreas" style="margin-top: 16px;">Save Areas</button>
+
+        <div style="display: flex; gap: 24px; height: 60vh;">
+          <div style="flex: 2; background: var(--accents-1); border: 1px solid var(--accents-2); border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; position: relative;">
+            <div id="editor-canvas" style="position: relative; background: #222; border: 2px solid #555; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; aspect-ratio: 2360 / 1640; overflow: hidden;">
+              <iframe id="editor-figma-preview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; pointer-events: none; opacity: 0.8;"></iframe>
+              <!-- Areas injected here -->
+            </div>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; background: var(--geist-bg); border: 1px solid var(--accents-2); border-radius: 8px; padding: 16px;">
+            <button type="button" class="btn" id="btnAddArea" style="margin-bottom: 16px;">+ Add Tap Area</button>
+            <div id="areas-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;"></div>
+            <button type="button" class="btn btn-outline" id="btnSaveAreas" style="margin-top: 16px;">Save Areas to Server</button>
+          </div>
         </div>
       </div>
     </div>
@@ -906,50 +922,17 @@
           });
         }
 
-        // First pass: parse all devices' areas to build preload maps
+        // Generate URLs
         const allRows = document.querySelectorAll('.device-row');
-        const allDeviceAreas = [];
-        allRows.forEach((row, i) => {
-          let areas = [];
-          try { areas = JSON.parse(row.querySelector('.device-areas')?.value || '[]'); } catch(e) {}
-          allDeviceAreas.push({ id: `target-${i}`, areas });
-        });
-
-        // Second pass: generate URLs with preload params
         allRows.forEach((row, i) => {
           const deviceId = `target-${i}`;
           const name = row.querySelector('.device-name').value;
           const node = row.querySelector('.device-node').value;
           const scale = row.querySelector('.device-scale').value;
-          const areasStr = row.querySelector('.device-areas')?.value || '[]';
 
           if (!node) return;
 
-          // Collect all frame URLs this device might need to display
-          const preloadUrls = new Set();
-          allDeviceAreas.forEach(source => {
-            source.areas.forEach(area => {
-              if (area.action !== 'jump' || !area.frameMappings) return;
-              area.frameMappings.forEach(m => {
-                if (!m.frameUrl) return;
-                // 'self' means the source device itself
-                const resolvedDevice = m.device === 'self' ? source.id : m.device;
-                if (resolvedDevice === deviceId || resolvedDevice === 'all') {
-                  preloadUrls.add(m.frameUrl);
-                }
-              });
-            });
-          });
-
           let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}&id=${deviceId}`;
-          if (areasStr && areasStr !== '[]') {
-            clientUrl += `&areas=${btoa(encodeURIComponent(areasStr))}`;
-          }
-          const preloadArray = Array.from(preloadUrls);
-          if (preloadArray.length > 0) {
-            clientUrl += `&preload=${btoa(encodeURIComponent(JSON.stringify(preloadArray)))}`;
-          }
-
           cardsData.push({ id: deviceId, name, desc: `Scale: ${scale}`, url: clientUrl });
         });
 

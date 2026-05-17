@@ -37,6 +37,20 @@ io.on("connection", (socket) => {
   io.emit("clients-count", io.engine.clientsCount);
 
   // Controller or Client sends 'trigger-action' → broadcast 'execute-action'
+  
+  socket.on("save-config", ({ nodeId, areas }) => {
+    if (nodeId) {
+      nodeConfigs[nodeId] = areas;
+      console.log(`[+] Saved ${areas.length} areas for node ${nodeId}`);
+      // Broadcast to any clients currently on this node
+      io.emit("config-updated", { nodeId, areas });
+    }
+  });
+
+  socket.on("get-config", (nodeId, callback) => {
+    if (callback) callback(nodeConfigs[nodeId] || []);
+  });
+
   socket.on("trigger-action", (payload) => {
     const dir = payload?.direction || "next";
     const target = payload?.target || "all";
