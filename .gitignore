@@ -4,3 +4,4 @@ npm-debug.log*
 package-lock.json
 mercedes_config.txt
 configs.json
+update_server.js
