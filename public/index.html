@@ -897,24 +897,51 @@
           });
         }
 
-        document.querySelectorAll('.device-row').forEach((row, i) => {
+        // First pass: parse all devices' areas to build preload maps
+        const allRows = document.querySelectorAll('.device-row');
+        const allDeviceAreas = [];
+        allRows.forEach((row, i) => {
+          let areas = [];
+          try { areas = JSON.parse(row.querySelector('.device-areas')?.value || '[]'); } catch(e) {}
+          allDeviceAreas.push({ id: `target-${i}`, areas });
+        });
+
+        // Second pass: generate URLs with preload params
+        allRows.forEach((row, i) => {
+          const deviceId = `target-${i}`;
           const name = row.querySelector('.device-name').value;
           const node = row.querySelector('.device-node').value;
           const scale = row.querySelector('.device-scale').value;
-          const areas = row.querySelector('.device-areas') ? row.querySelector('.device-areas').value : '[]';
-          
-          if (node) {
-            let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}&id=target-${i}`;
-            if (areas && areas !== '[]') {
-               clientUrl += `&areas=${btoa(encodeURIComponent(areas))}`;
-            }
-            cardsData.push({
-              id: `target-${i}`,
-              name: name,
-              desc: `Scale: ${scale}`,
-              url: clientUrl
+          const areasStr = row.querySelector('.device-areas')?.value || '[]';
+
+          if (!node) return;
+
+          // Collect all frame URLs this device might need to display
+          const preloadUrls = new Set();
+          allDeviceAreas.forEach(source => {
+            source.areas.forEach(area => {
+              if (area.action !== 'jump') return;
+              // If this area targets me (or all devices), preload the targetFrameUrl
+              if (area.targetFrameUrl && (area.target === deviceId || area.target === 'all')) {
+                preloadUrls.add(area.targetFrameUrl);
+              }
+              // If this area is ON my device, preload my selfFrameUrl
+              if (source.id === deviceId && area.selfFrameUrl) {
+                preloadUrls.add(area.selfFrameUrl);
+              }
             });
+          });
+
+          let clientUrl = `${hostUrl}/client.html?file=${globalFileId}&node=${node}&client=${clientId}&scale=${scale}&id=${deviceId}`;
+          if (areasStr && areasStr !== '[]') {
+            clientUrl += `&areas=${btoa(encodeURIComponent(areasStr))}`;
           }
+          const preloadArray = Array.from(preloadUrls);
+          if (preloadArray.length > 0) {
+            clientUrl += `&preload=${btoa(encodeURIComponent(JSON.stringify(preloadArray)))}`;
+          }
+
+          cardsData.push({ id: deviceId, name, desc: `Scale: ${scale}`, url: clientUrl });
         });
 
         cardsData.forEach((device) => {

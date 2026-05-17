@@ -1,132 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Figma Sync — Client</title>
   <style>
-    *,
-    *::before,
-    *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
 
-    html,
-    body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      /* Pure black for the bars if they show */
-    }
-
-    /* 
-       The "Over-scan" trick:
-       We make the iframe slightly larger than the screen (e.g., 105%)
-       and center it to hide Figma's default margins/edges.
-    */
     #iframe-container {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
     }
-
     .figma-frame {
-      border: none;
-      width: 100vw;
-      height: 100vh;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform-origin: center center;
-      /* Active frame is visible, others are hidden but loaded */
+      border: none; width: 100vw; height: 100vh;
+      position: absolute; top: 50%; left: 50%; transform-origin: center center;
     }
-
-    .figma-frame.hidden-frame {
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    .figma-frame.active-frame {
-      visibility: visible;
-      pointer-events: auto;
-    }
+    .figma-frame.hidden-frame { visibility: hidden; pointer-events: none; }
+    .figma-frame.active-frame { visibility: visible; pointer-events: auto; }
 
     #status {
-      position: fixed;
-      top: env(safe-area-inset-top, 12px);
-      right: env(safe-area-inset-right, 12px);
-      z-index: 9999;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font: 600 11px/1 -apple-system, sans-serif;
-      text-transform: uppercase;
-      color: #fff;
-      background: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      transition: opacity 0.4s ease;
-      pointer-events: none;
+      position: fixed; top: env(safe-area-inset-top, 12px); right: env(safe-area-inset-right, 12px);
+      z-index: 9999; padding: 6px 14px; border-radius: 20px;
+      font: 600 11px/1 -apple-system, sans-serif; text-transform: uppercase; color: #fff;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: opacity 0.4s ease; pointer-events: none;
     }
+    #status.connected { color: #4ade80; }
+    #status.disconnected { color: #f87171; }
+    #status.hidden { opacity: 0; }
 
-    #status.connected {
-      color: #4ade80;
-    }
-
-    #status.disconnected {
-      color: #f87171;
-    }
-
-    #status.hidden {
-      opacity: 0;
-    }
-
-    /* Interactive Areas */
-    #areas-container {
-      position: fixed;
-      inset: 0;
-      z-index: 9000;
-      pointer-events: none;
-    }
+    #areas-container { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
     .client-area {
-      position: absolute;
-      pointer-events: auto;
-      cursor: pointer;
-      /* background: rgba(255, 0, 0, 0.15); border: 1px solid red; /* Uncomment to debug */
+      position: absolute; pointer-events: auto; cursor: pointer;
+      /* background: rgba(255,0,0,0.15); border:1px solid red; /* debug */
     }
-    .client-area:active {
-      background: rgba(255, 255, 255, 0.08);
-    }
+    .client-area:active { background: rgba(255,255,255,0.08); }
   </style>
 </head>
-
 <body>
-
   <div id="status" class="disconnected">Connecting…</div>
-
-  <div id="iframe-container">
-    <!-- Primary iframe + pre-loaded pool iframes will be injected here -->
-  </div>
-
+  <div id="iframe-container"></div>
   <div id="areas-container"></div>
 
   <script src="/socket.io/socket.io.js"></script>
-
   <script>
     (() => {
       "use strict";
 
       const container = document.getElementById("iframe-container");
       const status = document.getElementById("status");
-
-      // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
 
       const fileId = params.get('file') || '';
@@ -136,7 +59,7 @@
       const deviceId = params.get('id') || 'unknown';
       const zoom = params.get('scale') || '1.14';
 
-      // ── 2. Build Figma Embed URL helper ───────────────────────────
+      // ── Helpers ────────────────────────────────────────────────────
       function buildEmbedUrl(fId, nId) {
         return `https://embed.figma.com/proto/${fId}/?node-id=${nId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
       }
@@ -144,20 +67,20 @@
       function parseNodeFromUrl(rawUrl) {
         try {
           const url = new URL(rawUrl);
-          const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
-          let pFileId = fileMatch ? fileMatch[1] : fileId;
+          const m = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
+          let pFileId = m ? m[1] : fileId;
           let pNodeId = url.searchParams.get('node-id');
           if (pNodeId) pNodeId = pNodeId.replace('-', ':').replace('%3A', ':');
           return { fileId: pFileId, nodeId: pNodeId };
-        } catch (e) { return { fileId: fileId, nodeId: null }; }
+        } catch (e) { return { fileId, nodeId: null }; }
       }
 
-      // ── 3. Iframe Pool ────────────────────────────────────────────
-      // Maps frameKey → { iframe, nodeId }
+      // ── Iframe Pool ────────────────────────────────────────────────
       const iframePool = {};
       let activeFrameKey = 'primary';
 
-      function createIframe(key, figmaUrl) {
+      function createPoolIframe(key, figmaUrl) {
+        if (iframePool[key]) return; // already exists
         const iframe = document.createElement('iframe');
         iframe.className = 'figma-frame hidden-frame';
         iframe.allowFullscreen = true;
@@ -165,132 +88,126 @@
         iframe.src = figmaUrl;
         container.appendChild(iframe);
         iframePool[key] = { iframe };
-        return iframe;
       }
 
       function switchToFrame(key) {
         if (!iframePool[key]) return;
-        // Hide all
-        Object.values(iframePool).forEach(entry => {
-          entry.iframe.classList.remove('active-frame');
-          entry.iframe.classList.add('hidden-frame');
+        Object.values(iframePool).forEach(e => {
+          e.iframe.classList.remove('active-frame');
+          e.iframe.classList.add('hidden-frame');
         });
-        // Show target
         iframePool[key].iframe.classList.remove('hidden-frame');
         iframePool[key].iframe.classList.add('active-frame');
         activeFrameKey = key;
       }
 
-      // Create primary iframe
+      function frameKeyFromUrl(rawUrl) {
+        const p = parseNodeFromUrl(rawUrl);
+        return p.nodeId ? 'frame_' + p.fileId + '_' + p.nodeId : null;
+      }
+
+      function preloadUrl(rawUrl) {
+        const p = parseNodeFromUrl(rawUrl);
+        if (!p.nodeId) return;
+        const key = 'frame_' + p.fileId + '_' + p.nodeId;
+        createPoolIframe(key, buildEmbedUrl(p.fileId, p.nodeId));
+      }
+
+      // ── Create primary iframe ──────────────────────────────────────
       if (fileId && nodeId) {
-        createIframe('primary', buildEmbedUrl(fileId, nodeId));
+        createPoolIframe('primary', buildEmbedUrl(fileId, nodeId));
         switchToFrame('primary');
       }
 
-      // ── 4. Parse areas and pre-load jump targets ──────────────────
+      // ── Pre-load frames from `preload` param ──────────────────────
+      const preloadParam = params.get('preload');
+      if (preloadParam) {
+        try {
+          const urls = JSON.parse(decodeURIComponent(atob(preloadParam)));
+          urls.forEach(url => preloadUrl(url));
+        } catch (e) { console.error("Failed to parse preload:", e); }
+      }
+
+      // ── Parse areas (for this device's tap overlays) ───────────────
       let areas = [];
       const areasParam = params.get('areas');
       if (areasParam) {
-        try {
-          const areasStr = decodeURIComponent(atob(areasParam));
-          areas = JSON.parse(areasStr);
-        } catch (e) { console.error("Failed to parse areas:", e); }
+        try { areas = JSON.parse(decodeURIComponent(atob(areasParam))); }
+        catch (e) { console.error("Failed to parse areas:", e); }
       }
 
-      // Pre-load all unique jump-frame URLs as hidden iframes
-      const preloadedKeys = new Set(['primary']);
-      areas.forEach(area => {
-        if (area.action === 'jump' && area.frameUrl) {
-          const key = 'frame_' + area.frameUrl;
-          if (!preloadedKeys.has(key)) {
-            preloadedKeys.add(key);
-            const parsed = parseNodeFromUrl(area.frameUrl);
-            if (parsed.nodeId) {
-              createIframe(key, buildEmbedUrl(parsed.fileId, parsed.nodeId));
-            }
-          }
-        }
-      });
+      // Also pre-load selfFrameUrls from this device's own areas
+      areas.forEach(a => { if (a.selfFrameUrl) preloadUrl(a.selfFrameUrl); });
 
-      // ── 5. Socket Connection ──────────────────────────────────────
+      // ── Socket ─────────────────────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
 
       socket.on("connect", () => {
-        status.textContent = "Connected";
-        status.className = "connected";
+        status.textContent = "Connected"; status.className = "connected";
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => status.classList.add("hidden"), 3000);
       });
-
       socket.on("disconnect", () => {
-        status.textContent = "Disconnected";
-        status.className = "disconnected";
+        status.textContent = "Disconnected"; status.className = "disconnected";
         clearTimeout(hideTimer);
       });
 
       socket.on("execute-action", (payload) => {
-        // Filter by target device
-        if (payload.target && payload.target !== 'all' && payload.target !== deviceId) return;
-
-        if (payload.direction === 'jump' && payload.frameUrl) {
-          // Instant swap to pre-loaded iframe
-          const key = 'frame_' + payload.frameUrl;
-          if (iframePool[key]) {
-            switchToFrame(key);
-          } else {
-            // Fallback: frame wasn't pre-loaded (shouldn't happen, but handle gracefully)
-            const parsed = parseNodeFromUrl(payload.frameUrl);
-            if (parsed.nodeId) {
-              createIframe(key, buildEmbedUrl(parsed.fileId, parsed.nodeId));
-              // Small delay to let iframe start loading, then switch
-              setTimeout(() => switchToFrame(key), 100);
+        // ── Jump with frame mappings ─────────────────────────────────
+        if (payload.direction === 'jump' && payload.frameMappings) {
+          // Specific device match takes priority over 'all'
+          const myMapping = payload.frameMappings.find(m => m.device === deviceId)
+                         || payload.frameMappings.find(m => m.device === 'all');
+          if (myMapping && myMapping.frameUrl) {
+            const key = frameKeyFromUrl(myMapping.frameUrl);
+            if (key && iframePool[key]) {
+              switchToFrame(key);
+            } else if (key) {
+              // Fallback: not pre-loaded, create on the fly
+              preloadUrl(myMapping.frameUrl);
+              setTimeout(() => switchToFrame(key), 150);
             }
           }
-        } else {
-          // Standard next/prev navigation on the ACTIVE iframe
-          const activeEntry = iframePool[activeFrameKey];
-          if (activeEntry && activeEntry.iframe.contentWindow) {
-            const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
-            activeEntry.iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
-          }
+          return;
+        }
+
+        // ── Standard next/prev ───────────────────────────────────────
+        if (payload.target && payload.target !== 'all' && payload.target !== deviceId) return;
+        const active = iframePool[activeFrameKey];
+        if (active && active.iframe.contentWindow) {
+          const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
+          active.iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
         }
       });
 
-      // ── 6. Render Interactive Areas ───────────────────────────────
+      // ── Render tap area overlays ───────────────────────────────────
       if (areas.length > 0) {
-        const areasContainer = document.getElementById('areas-container');
+        const ac = document.getElementById('areas-container');
         areas.forEach(area => {
           const div = document.createElement('div');
           div.className = 'client-area';
-          div.style.left = area.x + '%';
-          div.style.top = area.y + '%';
-          div.style.width = area.w + '%';
-          div.style.height = area.h + '%';
+          div.style.left = area.x + '%'; div.style.top = area.y + '%';
+          div.style.width = area.w + '%'; div.style.height = area.h + '%';
 
-          div.addEventListener('click', () => {
-            socket.emit('trigger-action', {
-              direction: area.action,
-              frameUrl: area.frameUrl || '',
-              target: area.target || 'all'
-            });
-          });
-
-          // Also handle touch for iPad
-          div.addEventListener('touchend', (e) => {
+          const handler = (e) => {
             e.preventDefault();
-            socket.emit('trigger-action', {
-              direction: area.action,
-              frameUrl: area.frameUrl || '',
-              target: area.target || 'all'
-            });
-          });
+            if (area.action === 'jump') {
+              const frameMappings = [];
+              if (area.targetFrameUrl) frameMappings.push({ device: area.target, frameUrl: area.targetFrameUrl });
+              if (area.selfFrameUrl) frameMappings.push({ device: deviceId, frameUrl: area.selfFrameUrl });
+              socket.emit('trigger-action', { direction: 'jump', frameMappings });
+            } else {
+              socket.emit('trigger-action', { direction: area.action, target: area.target || 'all' });
+            }
+          };
 
-          areasContainer.appendChild(div);
+          div.addEventListener('click', handler);
+          div.addEventListener('touchend', handler);
+          ac.appendChild(div);
         });
       }
     })();
   </script>
 </body>
-
 </html>
