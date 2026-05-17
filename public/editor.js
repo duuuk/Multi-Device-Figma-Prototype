@@ -147,17 +147,19 @@ function renderList() {
     if (isJump) {
       const mappings = area.frameMappings || [];
       mappingsHtml = mappings.map((m, mi) => `
-        <div style="display:flex;gap:8px;align-items:start;margin-bottom:8px;padding:10px;background:var(--geist-bg);border:1px solid var(--accents-2);border-radius:4px">
-          <div style="flex:0 0 140px">
+        <div style="margin-bottom:8px;padding:10px;background:var(--geist-bg);border:1px solid var(--accents-2);border-radius:4px">
+          <div style="margin-bottom: 8px;">
             <select class="mapping-device" data-area="${index}" data-mapping="${mi}" style="${selStyle};font-size:13px">
               ${deviceOpts.replace(`value="${m.device}"`, `value="${m.device}" selected`)}
             </select>
           </div>
-          <div style="flex:1">
-            <input type="text" class="mapping-url" data-area="${index}" data-mapping="${mi}" value="${m.frameUrl || ''}" placeholder="Figma frame URL..." style="font-size:13px; ${selStyle}">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div style="flex:1">
+              <input type="text" class="mapping-url" data-area="${index}" data-mapping="${mi}" value="${m.frameUrl || ''}" placeholder="Figma frame URL..." style="font-size:13px; ${selStyle}">
+            </div>
+            <button type="button" class="btn btn-outline" onclick="loadTargetScreen(${index}, ${mi})" style="flex:0 0 auto;width:auto;padding:4px 8px;font-size:12px;background:var(--accents-1);color:var(--geist-foreground);">Edit Target →</button>
+            <button type="button" class="btn-remove" onclick="removeMapping(${index},${mi})" style="flex:0 0 auto;width:auto;padding:4px 8px">✕</button>
           </div>
-          <button type="button" class="btn btn-outline" onclick="loadTargetScreen(${index}, ${mi})" style="flex:0 0 auto;padding:4px 8px;font-size:12px;background:var(--accents-1);color:var(--geist-foreground);">Edit Target →</button>
-          <button type="button" class="btn-remove" onclick="removeMapping(${index},${mi})" style="flex:0 0 auto;padding:4px 8px">✕</button>
         </div>
       `).join('');
     }
