@@ -69,7 +69,7 @@
         try {
           const url = new URL(rawUrl);
           let pNodeId = url.searchParams.get('node-id');
-          if (pNodeId) return pNodeId.replace('-', ':').replace('%3A', ':');
+          if (pNodeId) return pNodeId.replace(/-/g, ':').replace(/%3A/gi, ':');
         } catch (e) {}
         return null;
       }
@@ -91,15 +91,15 @@
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
 
-      socket.on("connect", () => {
-        status.textContent = "Connected"; status.className = "connected";
+      function showStatus(text, type = "connected") {
+        status.textContent = text;
+        status.className = type;
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => status.classList.add("hidden"), 3000);
-      });
-      socket.on("disconnect", () => {
-        status.textContent = "Disconnected"; status.className = "disconnected";
-        clearTimeout(hideTimer);
-      });
+      }
+
+      socket.on("connect", () => showStatus("Connected"));
+      socket.on("disconnect", () => showStatus("Disconnected", "disconnected"));
 
       socket.on("execute-action", (payload) => {
         if (!iframe.contentWindow) return;
@@ -112,10 +112,13 @@
           if (myMapping && myMapping.frameUrl) {
             const targetNodeId = parseNodeIdFromUrl(myMapping.frameUrl);
             if (targetNodeId) {
+              showStatus(`Jumping to: ${targetNodeId}`);
               iframe.contentWindow.postMessage({
                 type: 'NAVIGATE_TO_FRAME_AND_CLOSE_OVERLAYS',
                 data: { nodeId: targetNodeId }
               }, "https://www.figma.com");
+            } else {
+              showStatus("Error: Node ID not found in URL", "disconnected");
             }
           }
           return;
