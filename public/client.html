@@ -79,7 +79,7 @@
       // Iframes are registered with their URL but NOT loaded until needed.
       // This ensures Figma animations play fresh when the frame becomes visible.
       const iframePool = {};
-      let activeFrameKey = 'primary';
+      let activeFrameKey = null;
 
       function createPoolIframe(key, figmaUrl, loadNow) {
         if (iframePool[key]) return;
@@ -97,12 +97,7 @@
         if (key === activeFrameKey) return;
         const entry = iframePool[key];
 
-        // Load the iframe fresh (so animations play from start)
-        entry.iframe.src = entry.url;
-        entry.loaded = true;
-
-        // Wait for load, then swap — old frame stays visible during load
-        entry.iframe.onload = () => {
+        const doSwap = () => {
           Object.entries(iframePool).forEach(([k, e]) => {
             if (k === key) {
               e.iframe.classList.remove('hidden-frame');
@@ -110,12 +105,23 @@
             } else {
               e.iframe.classList.remove('active-frame');
               e.iframe.classList.add('hidden-frame');
-              // Unload non-active iframes to free memory & reset their state
+              // Unload non-primary iframes to reset animation state
               if (k !== 'primary') { e.iframe.src = ''; e.loaded = false; }
             }
           });
           activeFrameKey = key;
         };
+
+        if (entry.loaded) {
+          // Already loaded (e.g. primary at init) — swap immediately
+          doSwap();
+        } else {
+          // Load fresh so animations play from start
+          entry.iframe.src = entry.url;
+          entry.loaded = true;
+          // Old frame stays visible until new one loads
+          entry.iframe.onload = doSwap;
+        }
       }
 
       function frameKeyFromUrl(rawUrl) {
