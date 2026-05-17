@@ -24,11 +24,18 @@ window.openAreaEditor = function(row) {
 
   document.getElementById('editor-canvas').style.aspectRatio = `${w} / ${h}`;
 
-  try { currentAreas = JSON.parse(row.querySelector('.device-areas').value); }
-  catch(e) { currentAreas = []; }
+  try { currentAreas = JSON.parse(row.querySelector('.device-areas').value); } catch(e) { currentAreas = []; }
+  // Migrate old format: convert target/targetFrameUrl/selfFrameUrl to frameMappings
+  currentAreas.forEach(a => {
+    if (a.action === 'jump' && !a.frameMappings) {
+      a.frameMappings = [];
+      if (a.targetFrameUrl) a.frameMappings.push({ device: a.target || 'target-0', frameUrl: a.targetFrameUrl });
+      if (a.selfFrameUrl) a.frameMappings.push({ device: 'self', frameUrl: a.selfFrameUrl });
+      delete a.target; delete a.targetFrameUrl; delete a.selfFrameUrl;
+    }
+  });
 
-  renderCanvas();
-  renderList();
+  renderCanvas(); renderList();
   openModal('modal-areas');
 };
 
@@ -40,8 +47,10 @@ function saveAreas() {
 document.addEventListener('DOMContentLoaded', () => {
   const btnAdd = document.getElementById('btnAddArea');
   if (btnAdd) btnAdd.addEventListener('click', () => {
-    currentAreas.push({ id: 'area_' + Date.now(), x: 10, y: 10, w: 20, h: 20,
-      action: 'next', target: 'all', targetFrameUrl: '', selfFrameUrl: '' });
+    currentAreas.push({
+      id: 'area_' + Date.now(), x: 10, y: 10, w: 20, h: 20,
+      action: 'next', target: 'all', frameMappings: []
+    });
     renderCanvas(); renderList();
   });
 
@@ -67,9 +76,13 @@ function renderCanvas() {
     div.style.width = area.w + '%'; div.style.height = area.h + '%';
     div.dataset.index = index;
 
-    const targetName = area.target === 'all' ? 'All' :
-      (allAvailableDevices.find(d => d.id === area.target)?.name || area.target);
-    div.textContent = area.action === 'jump' ? `JUMP → ${targetName}` : `${area.action.toUpperCase()} → ${targetName}`;
+    if (area.action === 'jump') {
+      const count = (area.frameMappings || []).length;
+      div.textContent = `JUMP (${count} device${count !== 1 ? 's' : ''})`;
+    } else {
+      const tn = area.target === 'all' ? 'All' : (allAvailableDevices.find(d => d.id === area.target)?.name || area.target);
+      div.textContent = `${area.action.toUpperCase()} → ${tn}`;
+    }
 
     const handle = document.createElement('div');
     handle.className = 'resize-handle';
@@ -83,11 +96,37 @@ function renderList() {
   const list = document.getElementById('areas-list');
   if (!list) return;
   list.innerHTML = '';
+
+  const selStyle = 'width:100%;padding:8px;border-radius:var(--radius);background:var(--geist-bg);color:var(--geist-foreground);border:1px solid var(--accents-2)';
+
+  // Build device options including "This Device (self)"
+  const deviceOpts = `<option value="self">This Device (self)</option>` +
+    allAvailableDevices.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
   currentAreas.forEach((area, index) => {
     const item = document.createElement('div');
     item.style.cssText = 'background:var(--accents-1);padding:12px;border-radius:6px;border:1px solid var(--accents-2)';
+
     const isJump = area.action === 'jump';
-    const selStyle = 'width:100%;padding:8px;border-radius:var(--radius);background:var(--geist-bg);color:var(--geist-foreground);border:1px solid var(--accents-2)';
+
+    // Build mappings HTML
+    let mappingsHtml = '';
+    if (isJump) {
+      const mappings = area.frameMappings || [];
+      mappingsHtml = mappings.map((m, mi) => `
+        <div style="display:flex;gap:8px;align-items:start;margin-bottom:8px;padding:10px;background:var(--geist-bg);border:1px solid var(--accents-2);border-radius:4px">
+          <div style="flex:0 0 140px">
+            <select class="mapping-device" data-area="${index}" data-mapping="${mi}" style="${selStyle};font-size:13px">
+              ${deviceOpts.replace(`value="${m.device}"`, `value="${m.device}" selected`)}
+            </select>
+          </div>
+          <div style="flex:1">
+            <input type="text" class="mapping-url" data-area="${index}" data-mapping="${mi}" value="${m.frameUrl || ''}" placeholder="Figma frame URL..." style="font-size:13px">
+          </div>
+          <button type="button" class="btn-remove" onclick="removeMapping(${index},${mi})" style="flex:0 0 auto;padding:4px 8px">✕</button>
+        </div>
+      `).join('');
+    }
 
     item.innerHTML = `
       <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -95,49 +134,63 @@ function renderList() {
         <button type="button" class="btn-remove" onclick="removeArea(${index})">Delete</button>
       </div>
       <div class="form-group" style="margin-bottom:8px">
-        <label>Target Device</label>
-        <select class="area-target" data-index="${index}" style="${selStyle}">
-          <option value="all" ${area.target==='all'?'selected':''}>All Devices</option>
-          ${allAvailableDevices.map(d => `<option value="${d.id}" ${area.target===d.id?'selected':''}>${d.name}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-group" style="margin-bottom:8px">
         <label>Action</label>
         <select class="area-action" data-index="${index}" style="${selStyle}">
           <option value="next" ${area.action==='next'?'selected':''}>Next Frame (→)</option>
           <option value="prev" ${area.action==='prev'?'selected':''}>Prev Frame (←)</option>
-          <option value="jump" ${area.action==='jump'?'selected':''}>Jump to Frame (instant)</option>
+          <option value="jump" ${area.action==='jump'?'selected':''}>Jump to Frame</option>
         </select>
       </div>
-      <div class="jump-fields" style="display:${isJump?'block':'none'}">
-        <div class="form-group" style="margin-bottom:8px">
-          <label>Target Device → Frame URL</label>
-          <input type="text" class="area-target-frame" data-index="${index}" value="${area.targetFrameUrl||''}" placeholder="Figma URL for the target device...">
-          <p style="font-size:11px;color:var(--accents-4);margin-top:4px">The frame the target device will show (pre-loaded, instant switch)</p>
-        </div>
+      ${!isJump ? `
         <div class="form-group" style="margin-bottom:0">
-          <label>This Device → Frame URL <span style="color:var(--accents-4);font-weight:400">(optional)</span></label>
-          <input type="text" class="area-self-frame" data-index="${index}" value="${area.selfFrameUrl||''}" placeholder="Figma URL for this device...">
-          <p style="font-size:11px;color:var(--accents-4);margin-top:4px">Leave empty to keep this device unchanged</p>
+          <label>Target Device</label>
+          <select class="area-target" data-index="${index}" style="${selStyle}">
+            <option value="all" ${area.target==='all'?'selected':''}>All Devices</option>
+            ${allAvailableDevices.map(d => `<option value="${d.id}" ${area.target===d.id?'selected':''}>${d.name}</option>`).join('')}
+          </select>
         </div>
-      </div>`;
+      ` : `
+        <div style="margin-bottom:8px">
+          <label style="margin-bottom:8px">Device → Frame Mappings</label>
+          <p style="font-size:11px;color:var(--accents-4);margin-bottom:10px">Each device listed will instantly jump to its assigned frame. Pre-loaded, no loading screen.</p>
+          ${mappingsHtml}
+          <button type="button" class="btn btn-outline" onclick="addMapping(${index})" style="padding:6px 12px;font-size:12px;width:auto">+ Add Device</button>
+        </div>
+      `}
+    `;
     list.appendChild(item);
   });
 
+  // Bind events
   list.querySelectorAll('.area-action').forEach(s => s.addEventListener('change', e => {
-    currentAreas[e.target.dataset.index].action = e.target.value;
+    const idx = e.target.dataset.index;
+    currentAreas[idx].action = e.target.value;
+    if (e.target.value === 'jump' && !currentAreas[idx].frameMappings) currentAreas[idx].frameMappings = [];
     renderList(); renderCanvas();
   }));
   list.querySelectorAll('.area-target').forEach(s => s.addEventListener('change', e => {
     currentAreas[e.target.dataset.index].target = e.target.value; renderCanvas();
   }));
-  list.querySelectorAll('.area-target-frame').forEach(s => s.addEventListener('input', e => {
-    currentAreas[e.target.dataset.index].targetFrameUrl = e.target.value;
+  list.querySelectorAll('.mapping-device').forEach(s => s.addEventListener('change', e => {
+    const ai = e.target.dataset.area, mi = e.target.dataset.mapping;
+    currentAreas[ai].frameMappings[mi].device = e.target.value; renderCanvas();
   }));
-  list.querySelectorAll('.area-self-frame').forEach(s => s.addEventListener('input', e => {
-    currentAreas[e.target.dataset.index].selfFrameUrl = e.target.value;
+  list.querySelectorAll('.mapping-url').forEach(s => s.addEventListener('input', e => {
+    const ai = e.target.dataset.area, mi = e.target.dataset.mapping;
+    currentAreas[ai].frameMappings[mi].frameUrl = e.target.value;
   }));
 }
+
+window.addMapping = function(areaIndex) {
+  if (!currentAreas[areaIndex].frameMappings) currentAreas[areaIndex].frameMappings = [];
+  currentAreas[areaIndex].frameMappings.push({ device: 'self', frameUrl: '' });
+  renderList(); renderCanvas();
+};
+
+window.removeMapping = function(areaIndex, mappingIndex) {
+  currentAreas[areaIndex].frameMappings.splice(mappingIndex, 1);
+  renderList(); renderCanvas();
+};
 
 window.removeArea = function(i) { currentAreas.splice(i, 1); renderCanvas(); renderList(); };
 

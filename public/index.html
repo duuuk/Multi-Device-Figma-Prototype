@@ -920,15 +920,15 @@
           const preloadUrls = new Set();
           allDeviceAreas.forEach(source => {
             source.areas.forEach(area => {
-              if (area.action !== 'jump') return;
-              // If this area targets me (or all devices), preload the targetFrameUrl
-              if (area.targetFrameUrl && (area.target === deviceId || area.target === 'all')) {
-                preloadUrls.add(area.targetFrameUrl);
-              }
-              // If this area is ON my device, preload my selfFrameUrl
-              if (source.id === deviceId && area.selfFrameUrl) {
-                preloadUrls.add(area.selfFrameUrl);
-              }
+              if (area.action !== 'jump' || !area.frameMappings) return;
+              area.frameMappings.forEach(m => {
+                if (!m.frameUrl) return;
+                // 'self' means the source device itself
+                const resolvedDevice = m.device === 'self' ? source.id : m.device;
+                if (resolvedDevice === deviceId || resolvedDevice === 'all') {
+                  preloadUrls.add(m.frameUrl);
+                }
+              });
             });
           });
 

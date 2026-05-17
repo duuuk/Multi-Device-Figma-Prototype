@@ -136,8 +136,14 @@
         catch (e) { console.error("Failed to parse areas:", e); }
       }
 
-      // Also pre-load selfFrameUrls from this device's own areas
-      areas.forEach(a => { if (a.selfFrameUrl) preloadUrl(a.selfFrameUrl); });
+      // Also pre-load frames from this device's own areas' frameMappings
+      areas.forEach(a => {
+        if (a.frameMappings) {
+          a.frameMappings.forEach(m => {
+            if ((m.device === 'self' || m.device === deviceId) && m.frameUrl) preloadUrl(m.frameUrl);
+          });
+        }
+      });
 
       // ── Socket ─────────────────────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
@@ -156,7 +162,6 @@
       socket.on("execute-action", (payload) => {
         // ── Jump with frame mappings ─────────────────────────────────
         if (payload.direction === 'jump' && payload.frameMappings) {
-          // Specific device match takes priority over 'all'
           const myMapping = payload.frameMappings.find(m => m.device === deviceId)
                          || payload.frameMappings.find(m => m.device === 'all');
           if (myMapping && myMapping.frameUrl) {
@@ -164,7 +169,6 @@
             if (key && iframePool[key]) {
               switchToFrame(key);
             } else if (key) {
-              // Fallback: not pre-loaded, create on the fly
               preloadUrl(myMapping.frameUrl);
               setTimeout(() => switchToFrame(key), 150);
             }
@@ -192,11 +196,12 @@
 
           const handler = (e) => {
             e.preventDefault();
-            if (area.action === 'jump') {
-              const frameMappings = [];
-              if (area.targetFrameUrl) frameMappings.push({ device: area.target, frameUrl: area.targetFrameUrl });
-              if (area.selfFrameUrl) frameMappings.push({ device: deviceId, frameUrl: area.selfFrameUrl });
-              socket.emit('trigger-action', { direction: 'jump', frameMappings });
+            if (area.action === 'jump' && area.frameMappings) {
+              // Resolve 'self' to actual deviceId before emitting
+              const resolved = area.frameMappings
+                .filter(m => m.frameUrl)
+                .map(m => ({ device: m.device === 'self' ? deviceId : m.device, frameUrl: m.frameUrl }));
+              socket.emit('trigger-action', { direction: 'jump', frameMappings: resolved });
             } else {
               socket.emit('trigger-action', { direction: area.action, target: area.target || 'all' });
             }
