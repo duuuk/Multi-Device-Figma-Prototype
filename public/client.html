@@ -109,18 +109,34 @@
         // 1. Fade in black curtain
         curtain.classList.add('active');
 
-        // 2. After curtain is opaque, change iframe src
+        // 2. After curtain is fully opaque, change iframe src
         setTimeout(() => {
           iframe.src = embedUrl;
 
-          // 3. Wait for load + extra time for Figma to render
-          iframe.onload = () => {
-            setTimeout(() => {
-              // 4. Fade out curtain to reveal new content
-              curtain.classList.remove('active');
-              switching = false;
-            }, 600);
-          };
+          // 3. Wait for Figma to signal it's ready via postMessage,
+          //    or fall back to a generous timeout
+          let revealed = false;
+
+          function reveal() {
+            if (revealed) return;
+            revealed = true;
+            window.removeEventListener('message', onFigmaMsg);
+            curtain.classList.remove('active');
+            switching = false;
+          }
+
+          function onFigmaMsg(e) {
+            // Figma sends messages from its origin when the prototype loads
+            if (e.origin && e.origin.includes('figma.com')) {
+              // Give it a tiny bit more time after the first Figma message
+              setTimeout(reveal, 300);
+            }
+          }
+
+          window.addEventListener('message', onFigmaMsg);
+
+          // Fallback: if Figma never posts a message, reveal after 4s
+          setTimeout(reveal, 4000);
         }, 300);
       }
 
