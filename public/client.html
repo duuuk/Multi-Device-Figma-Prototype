@@ -15,10 +15,11 @@
     .figma-frame {
       border: none; width: 100vw; height: 100vh;
       position: absolute; top: 50%; left: 50%; transform-origin: center center;
-      background: #000;
+      background: #000; z-index: 1; opacity: 0;
+      transition: opacity 0.15s ease;
     }
-    .figma-frame.hidden-frame { visibility: hidden; pointer-events: none; }
-    .figma-frame.active-frame { visibility: visible; pointer-events: auto; }
+    .figma-frame.active-frame { z-index: 2; opacity: 1; pointer-events: auto; }
+    .figma-frame.incoming-frame { z-index: 3; opacity: 0; pointer-events: none; }
 
     #status {
       position: fixed; top: env(safe-area-inset-top, 12px); right: env(safe-area-inset-right, 12px);
@@ -98,30 +99,36 @@
         if (key === activeFrameKey) return;
         const entry = iframePool[key];
 
-        const doSwap = () => {
+        if (entry.loaded) {
+          // Already loaded (e.g. primary at init) — show immediately
+          Object.values(iframePool).forEach(e => e.iframe.className = 'figma-frame');
+          entry.iframe.className = 'figma-frame active-frame';
+          // Unload others to reset animation state
           Object.entries(iframePool).forEach(([k, e]) => {
-            if (k === key) {
-              e.iframe.classList.remove('hidden-frame');
-              e.iframe.classList.add('active-frame');
-            } else {
-              e.iframe.classList.remove('active-frame');
-              e.iframe.classList.add('hidden-frame');
-              // Unload non-primary iframes to reset animation state
-              if (k !== 'primary') { e.iframe.src = ''; e.loaded = false; }
-            }
+            if (k !== key && k !== 'primary') { e.iframe.src = ''; e.loaded = false; }
           });
           activeFrameKey = key;
-        };
-
-        if (entry.loaded) {
-          // Already loaded (e.g. primary at init) — swap immediately
-          doSwap();
         } else {
-          // Load fresh so animations play from start
+          // Load fresh — old frame stays visible underneath
+          entry.iframe.className = 'figma-frame incoming-frame';
           entry.iframe.src = entry.url;
           entry.loaded = true;
-          // Old frame stays visible until new one loads + renders
-          entry.iframe.onload = () => setTimeout(doSwap, 200);
+          entry.iframe.onload = () => {
+            // Wait for Figma to render, then fade in on top
+            setTimeout(() => {
+              entry.iframe.className = 'figma-frame active-frame';
+              // After fade transition, clean up old frames
+              setTimeout(() => {
+                Object.entries(iframePool).forEach(([k, e]) => {
+                  if (k !== key) {
+                    e.iframe.className = 'figma-frame';
+                    if (k !== 'primary') { e.iframe.src = ''; e.loaded = false; }
+                  }
+                });
+              }, 200);
+              activeFrameKey = key;
+            }, 400);
+          };
         }
       }
 
