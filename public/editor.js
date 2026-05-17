@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         x: 10, y: 10, w: 20, h: 20,
         action: 'next',
         target: 'all',
-        url: ''
+        frameUrl: ''
       });
       renderCanvas();
       renderList();
@@ -92,7 +92,9 @@ function renderCanvas() {
      div.style.width = area.w + '%';
      div.style.height = area.h + '%';
      div.dataset.index = index;
-     div.textContent = area.action.toUpperCase();
+     
+     const label = area.action === 'jump' ? '⇥ JUMP' : area.action.toUpperCase();
+     div.textContent = label;
      
      const handle = document.createElement('div');
      handle.className = 'resize-handle';
@@ -114,6 +116,15 @@ function renderList() {
     item.style.borderRadius = '6px';
     item.style.border = '1px solid var(--accents-2)';
     
+    // Extract node-id from frameUrl for display
+    let frameNodeDisplay = '';
+    if (area.frameUrl) {
+      try {
+        const u = new URL(area.frameUrl);
+        frameNodeDisplay = u.searchParams.get('node-id') || '';
+      } catch(e) {}
+    }
+    
     item.innerHTML = `
       <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
         <strong style="color: var(--geist-foreground);">Area ${index + 1}</strong>
@@ -129,14 +140,15 @@ function renderList() {
       <div class="form-group" style="margin-bottom: 8px;">
         <label>Action</label>
         <select class="area-action" data-index="${index}" style="width:100%; padding:8px; border-radius: var(--radius); background:var(--geist-bg); color:var(--geist-foreground); border:1px solid var(--accents-2);">
-           <option value="next" ${area.action==='next'?'selected':''}>Next</option>
-           <option value="prev" ${area.action==='prev'?'selected':''}>Prev</option>
-           <option value="jump" ${area.action==='jump'?'selected':''}>Jump to URL</option>
+           <option value="next" ${area.action==='next'?'selected':''}>Next Frame (→)</option>
+           <option value="prev" ${area.action==='prev'?'selected':''}>Prev Frame (←)</option>
+           <option value="jump" ${area.action==='jump'?'selected':''}>Jump to Frame (instant)</option>
         </select>
       </div>
       <div class="form-group url-group" style="margin-bottom: 0; display: ${area.action==='jump'?'block':'none'}">
-        <label>Target URL</label>
-        <input type="text" class="area-url" data-index="${index}" value="${area.url || ''}" placeholder="https://...">
+        <label>Figma Frame URL ${frameNodeDisplay ? '<span style="color:var(--accents-4); font-weight:400;">Node: ' + frameNodeDisplay + '</span>' : ''}</label>
+        <input type="text" class="area-frame-url" data-index="${index}" value="${area.frameUrl || ''}" placeholder="Paste the Figma prototype URL for the target frame...">
+        <p style="font-size: 11px; color: var(--accents-4); margin-top: 4px;">This frame will be pre-loaded on the client for instant switching — no loading screen.</p>
       </div>
     `;
     list.appendChild(item);
@@ -158,10 +170,10 @@ function renderList() {
     });
   });
   
-  list.querySelectorAll('.area-url').forEach(inp => {
+  list.querySelectorAll('.area-frame-url').forEach(inp => {
     inp.addEventListener('input', (e) => {
        const idx = e.target.dataset.index;
-       currentAreas[idx].url = e.target.value;
+       currentAreas[idx].frameUrl = e.target.value;
     });
   });
 }

@@ -38,12 +38,25 @@
       overflow: hidden;
     }
 
-    #figma-frame {
+    .figma-frame {
       border: none;
-      /* These dimensions will be boosted by the 'scale' parameter in JS */
       width: 100vw;
       height: 100vh;
-      transition: transform 0.3s ease;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform-origin: center center;
+      /* Active frame is visible, others are hidden but loaded */
+    }
+
+    .figma-frame.hidden-frame {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .figma-frame.active-frame {
+      visibility: visible;
+      pointer-events: auto;
     }
 
     #status {
@@ -86,7 +99,10 @@
       position: absolute;
       pointer-events: auto;
       cursor: pointer;
-      /* background: rgba(255, 0, 0, 0.2); Uncomment to debug */
+      /* background: rgba(255, 0, 0, 0.15); border: 1px solid red; /* Uncomment to debug */
+    }
+    .client-area:active {
+      background: rgba(255, 255, 255, 0.08);
     }
   </style>
 </head>
@@ -96,7 +112,7 @@
   <div id="status" class="disconnected">Connecting…</div>
 
   <div id="iframe-container">
-    <iframe id="figma-frame" allowfullscreen></iframe>
+    <!-- Primary iframe + pre-loaded pool iframes will be injected here -->
   </div>
 
   <div id="areas-container"></div>
@@ -107,28 +123,96 @@
     (() => {
       "use strict";
 
-      const iframe = document.getElementById("figma-frame");
+      const container = document.getElementById("iframe-container");
       const status = document.getElementById("status");
 
       // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
 
-      // Values are passed via URL parameters dynamically from the setup dashboard
       const fileId = params.get('file') || '';
       const nodeId = params.get('node') || '';
       const clientId = params.get('client') || '';
       const host = params.get('host') || 'multi-device-sync';
       const deviceId = params.get('id') || 'unknown';
-
-      // 'scale' allows you to zoom in slightly to hide edges (e.g., 1.05)
       const zoom = params.get('scale') || '1.14';
-      iframe.style.transform = `scale(${zoom})`;
 
-      // Build the URL
-      const figmaUrl = fileId && nodeId ? `https://embed.figma.com/proto/${fileId}/?node-id=${nodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}` : '';
-      if (figmaUrl) iframe.src = figmaUrl;
+      // ── 2. Build Figma Embed URL helper ───────────────────────────
+      function buildEmbedUrl(fId, nId) {
+        return `https://embed.figma.com/proto/${fId}/?node-id=${nId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
+      }
 
-      // ── 2. Socket Connection ──────────────────────────────────────
+      function parseNodeFromUrl(rawUrl) {
+        try {
+          const url = new URL(rawUrl);
+          const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
+          let pFileId = fileMatch ? fileMatch[1] : fileId;
+          let pNodeId = url.searchParams.get('node-id');
+          if (pNodeId) pNodeId = pNodeId.replace('-', ':').replace('%3A', ':');
+          return { fileId: pFileId, nodeId: pNodeId };
+        } catch (e) { return { fileId: fileId, nodeId: null }; }
+      }
+
+      // ── 3. Iframe Pool ────────────────────────────────────────────
+      // Maps frameKey → { iframe, nodeId }
+      const iframePool = {};
+      let activeFrameKey = 'primary';
+
+      function createIframe(key, figmaUrl) {
+        const iframe = document.createElement('iframe');
+        iframe.className = 'figma-frame hidden-frame';
+        iframe.allowFullscreen = true;
+        iframe.style.transform = `translate(-50%, -50%) scale(${zoom})`;
+        iframe.src = figmaUrl;
+        container.appendChild(iframe);
+        iframePool[key] = { iframe };
+        return iframe;
+      }
+
+      function switchToFrame(key) {
+        if (!iframePool[key]) return;
+        // Hide all
+        Object.values(iframePool).forEach(entry => {
+          entry.iframe.classList.remove('active-frame');
+          entry.iframe.classList.add('hidden-frame');
+        });
+        // Show target
+        iframePool[key].iframe.classList.remove('hidden-frame');
+        iframePool[key].iframe.classList.add('active-frame');
+        activeFrameKey = key;
+      }
+
+      // Create primary iframe
+      if (fileId && nodeId) {
+        createIframe('primary', buildEmbedUrl(fileId, nodeId));
+        switchToFrame('primary');
+      }
+
+      // ── 4. Parse areas and pre-load jump targets ──────────────────
+      let areas = [];
+      const areasParam = params.get('areas');
+      if (areasParam) {
+        try {
+          const areasStr = decodeURIComponent(atob(areasParam));
+          areas = JSON.parse(areasStr);
+        } catch (e) { console.error("Failed to parse areas:", e); }
+      }
+
+      // Pre-load all unique jump-frame URLs as hidden iframes
+      const preloadedKeys = new Set(['primary']);
+      areas.forEach(area => {
+        if (area.action === 'jump' && area.frameUrl) {
+          const key = 'frame_' + area.frameUrl;
+          if (!preloadedKeys.has(key)) {
+            preloadedKeys.add(key);
+            const parsed = parseNodeFromUrl(area.frameUrl);
+            if (parsed.nodeId) {
+              createIframe(key, buildEmbedUrl(parsed.fileId, parsed.nodeId));
+            }
+          }
+        }
+      });
+
+      // ── 5. Socket Connection ──────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
 
@@ -146,55 +230,64 @@
       });
 
       socket.on("execute-action", (payload) => {
+        // Filter by target device
         if (payload.target && payload.target !== 'all' && payload.target !== deviceId) return;
-        
-        if (!iframe.contentWindow) return;
-        
-        if (payload.direction === 'jump' && payload.url) {
-           function getEmbedUrl(rawUrl) {
-               try {
-                  const url = new URL(rawUrl);
-                  const fileMatch = url.pathname.match(/\/(?:file|design|proto)\/([a-zA-Z0-9]+)\//);
-                  let pFileId = fileMatch ? fileMatch[1] : fileId;
-                  let pNodeId = url.searchParams.get('node-id');
-                  if (pNodeId) pNodeId = pNodeId.replace('-', ':').replace('%3A', ':');
-                  if (!pNodeId) return rawUrl;
-                  return `https://embed.figma.com/proto/${pFileId}/?node-id=${pNodeId}&scaling=scale-down&hide-ui=1&embed-host=${host}&client-id=${clientId}`;
-               } catch(e) { return rawUrl; }
-           }
-           iframe.src = getEmbedUrl(payload.url);
+
+        if (payload.direction === 'jump' && payload.frameUrl) {
+          // Instant swap to pre-loaded iframe
+          const key = 'frame_' + payload.frameUrl;
+          if (iframePool[key]) {
+            switchToFrame(key);
+          } else {
+            // Fallback: frame wasn't pre-loaded (shouldn't happen, but handle gracefully)
+            const parsed = parseNodeFromUrl(payload.frameUrl);
+            if (parsed.nodeId) {
+              createIframe(key, buildEmbedUrl(parsed.fileId, parsed.nodeId));
+              // Small delay to let iframe start loading, then switch
+              setTimeout(() => switchToFrame(key), 100);
+            }
+          }
         } else {
-           const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
-           iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
+          // Standard next/prev navigation on the ACTIVE iframe
+          const activeEntry = iframePool[activeFrameKey];
+          if (activeEntry && activeEntry.iframe.contentWindow) {
+            const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
+            activeEntry.iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
+          }
         }
       });
 
-      // ── 3. Render Interactive Areas ──────────────────────────────────
-      const areasParam = params.get('areas');
-      if (areasParam) {
-         try {
-            const areasStr = decodeURIComponent(atob(areasParam));
-            const areas = JSON.parse(areasStr);
-            const container = document.getElementById('areas-container');
-            areas.forEach(area => {
-               const div = document.createElement('div');
-               div.className = 'client-area';
-               div.style.left = area.x + '%';
-               div.style.top = area.y + '%';
-               div.style.width = area.w + '%';
-               div.style.height = area.h + '%';
-               
-               div.addEventListener('click', () => {
-                  socket.emit('trigger-action', { 
-                     direction: area.action,
-                     url: area.url,
-                     target: area.target || 'all'
-                  });
-               });
-               
-               container.appendChild(div);
+      // ── 6. Render Interactive Areas ───────────────────────────────
+      if (areas.length > 0) {
+        const areasContainer = document.getElementById('areas-container');
+        areas.forEach(area => {
+          const div = document.createElement('div');
+          div.className = 'client-area';
+          div.style.left = area.x + '%';
+          div.style.top = area.y + '%';
+          div.style.width = area.w + '%';
+          div.style.height = area.h + '%';
+
+          div.addEventListener('click', () => {
+            socket.emit('trigger-action', {
+              direction: area.action,
+              frameUrl: area.frameUrl || '',
+              target: area.target || 'all'
             });
-         } catch(e) { console.error("Failed to parse areas:", e); }
+          });
+
+          // Also handle touch for iPad
+          div.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            socket.emit('trigger-action', {
+              direction: area.action,
+              frameUrl: area.frameUrl || '',
+              target: area.target || 'all'
+            });
+          });
+
+          areasContainer.appendChild(div);
+        });
       }
     })();
   </script>
