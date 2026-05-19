@@ -165,11 +165,15 @@
 
         // ── Jump using native Figma postMessage ──────────────────────
         if (payload.direction === 'jump' && payload.frameMappings) {
+          console.log('[JUMP] Received frameMappings:', JSON.stringify(payload.frameMappings));
+          console.log('[JUMP] My deviceId:', deviceId);
           const myMapping = payload.frameMappings.find(m => m.device === deviceId)
                          || payload.frameMappings.find(m => m.device === 'all');
+          console.log('[JUMP] Matched mapping:', JSON.stringify(myMapping));
           
           if (myMapping && myMapping.frameUrl) {
             const targetNodeId = parseNodeIdFromUrl(myMapping.frameUrl);
+            console.log('[JUMP] Parsed targetNodeId:', targetNodeId);
             if (targetNodeId) {
               showStatus(`Jumping to: ${targetNodeId}`);
               iframe.contentWindow.postMessage({

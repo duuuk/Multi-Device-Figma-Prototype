@@ -99,6 +99,8 @@
       gap: 20px;
       color: #fff;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      max-width: 95vw;
+      overflow-x: auto;
     }
 
     #hud kbd {
@@ -109,6 +111,10 @@
       font-size: 12px;
       margin-right: 4px;
       font-family: inherit;
+      text-transform: uppercase;
+      min-width: 22px;
+      text-align: center;
+      display: inline-block;
     }
 
     #hud span {
@@ -121,6 +127,40 @@
 
     #hud .sep {
       color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Key fired badge */
+    #key-badge {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.5);
+      z-index: 10000;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      padding: 20px 40px;
+      border-radius: 20px;
+      pointer-events: none;
+      opacity: 0;
+      transition: none;
+    }
+
+    #key-badge.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 0.1s ease-out, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    #key-badge.fade {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.8);
+      transition: opacity 0.3s ease-in, transform 0.3s ease-in;
     }
   </style>
 </head>
@@ -138,8 +178,13 @@
     <span class="sep">│</span>
     <span><kbd>→</kbd> Next</span>
     <span class="sep">│</span>
+    <span id="hud-bindings"></span>
+    <span class="sep">│</span>
     <span><strong id="clients-count">0</strong>&nbsp;Clients</span>
   </div>
+
+  <!-- Key fired badge -->
+  <div id="key-badge"></div>
 
   <script src="/socket.io/socket.io.js"></script>
 
@@ -151,6 +196,8 @@
       const statusEl = document.getElementById("status");
       const flash = document.getElementById("flash");
       const clientsCount = document.getElementById("clients-count");
+      const keyBadge = document.getElementById("key-badge");
+      const hudBindings = document.getElementById("hud-bindings");
 
       // ── 1. Dynamic Configuration ──────────────────────────────────
       const params = new URLSearchParams(window.location.search);
@@ -169,12 +216,18 @@
       // ── 2. Socket Connection ──────────────────────────────────────
       const socket = io({ transports: ["websocket"] });
       let hideTimer;
+      let activeKeyBindings = [];
 
       socket.on("connect", () => {
         statusEl.textContent = "Connected";
         statusEl.className = "connected";
         clearTimeout(hideTimer);
         hideTimer = setTimeout(() => statusEl.classList.add("hidden"), 3000);
+        // Fetch key bindings from server
+        socket.emit("get-key-bindings", (bindings) => {
+          activeKeyBindings = bindings || [];
+          updateHudBindings();
+        });
       });
 
       socket.on("disconnect", () => {
@@ -187,18 +240,99 @@
         clientsCount.textContent = count;
       });
 
+      // Listen for live key binding updates from dashboard
+      socket.on("key-bindings-updated", (bindings) => {
+        activeKeyBindings = bindings || [];
+        updateHudBindings();
+      });
+
+      function updateHudBindings() {
+        if (!activeKeyBindings.length) {
+          hudBindings.innerHTML = '<span style="color: rgba(255,255,255,0.3); font-size: 12px;">No key bindings</span>';
+          return;
+        }
+        hudBindings.innerHTML = activeKeyBindings.map(b =>
+          `<span style="margin-right: 8px;"><kbd>${b.key.toUpperCase()}</kbd> ${b.label || '?'}</span>`
+        ).join('');
+      }
+
+      function showKeyBadge(key, label) {
+        keyBadge.textContent = `${key.toUpperCase()}` + (label ? ` — ${label}` : '');
+        keyBadge.className = '';
+        // Force reflow
+        void keyBadge.offsetWidth;
+        keyBadge.classList.add('show');
+        setTimeout(() => {
+          keyBadge.classList.remove('show');
+          keyBadge.classList.add('fade');
+        }, 400);
+      }
+
       socket.on("execute-action", (payload) => {
         if (!iframe.contentWindow) return;
+
+        // Handle jump actions (from key bindings or tap areas)
+        if (payload.direction === 'jump' && payload.frameMappings) {
+          const myMapping = payload.frameMappings.find(m => m.device === 'controller');
+          if (myMapping && myMapping.frameUrl) {
+            const targetNodeId = parseNodeIdFromUrl(myMapping.frameUrl);
+            if (targetNodeId) {
+              iframe.contentWindow.postMessage({
+                type: 'NAVIGATE_TO_FRAME_AND_CLOSE_OVERLAYS',
+                data: { nodeId: targetNodeId, node_id: targetNodeId }
+              }, "https://www.figma.com");
+            }
+          }
+          return;
+        }
+
         const type = payload.direction === "prev" ? "NAVIGATE_BACKWARD" : "NAVIGATE_FORWARD";
 
         // Use the verified Figma origin for maximum reliability
         iframe.contentWindow.postMessage({ type }, "https://www.figma.com");
       });
 
+      function parseNodeIdFromUrl(rawUrl) {
+        try {
+          const url = new URL(rawUrl);
+          let pNodeId = url.searchParams.get('node-id');
+          if (pNodeId) return pNodeId.replace(/-/g, ':').replace(/%3A/gi, ':');
+        } catch (e) {}
+        return null;
+      }
+
       // ── 3. Interaction & Keyboard ──────────────────────────────────
       window.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowRight") socket.emit("trigger-action", { direction: "next" });
-        if (e.key === "ArrowLeft") socket.emit("trigger-action", { direction: "prev" });
+        // Standard arrow key navigation
+        if (e.key === "ArrowRight") {
+          socket.emit("trigger-action", { direction: "next" });
+          return;
+        }
+        if (e.key === "ArrowLeft") {
+          socket.emit("trigger-action", { direction: "prev" });
+          return;
+        }
+
+        // Custom key bindings
+        const pressedKey = e.key.toLowerCase();
+        const binding = activeKeyBindings.find(b => b.key.toLowerCase() === pressedKey);
+        if (binding && binding.frameMappings && binding.frameMappings.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          showKeyBadge(binding.key, binding.label);
+
+          // Flash
+          flash.classList.remove('active');
+          void flash.offsetWidth;
+          flash.classList.add('active');
+
+          socket.emit("trigger-action", {
+            direction: 'jump',
+            frameMappings: binding.frameMappings.filter(m => m.frameUrl)
+          });
+          console.log('[KB] Emitted jump:', JSON.stringify(binding.frameMappings.filter(m => m.frameUrl)));
+        }
       }, { capture: true });
 
       // Focus reclaiming

@@ -196,6 +196,25 @@
       cursor: default;
     }
 
+    select {
+      width: 100%;
+      background: var(--geist-bg);
+      border: 1px solid var(--accents-2);
+      color: var(--geist-foreground);
+      padding: 8px 12px;
+      border-radius: var(--radius);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      transition: border-color 0.2s ease;
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    select:focus {
+      border-color: var(--accents-5);
+    }
+
     .btn {
       width: 100%;
       padding: 10px 16px;
@@ -591,6 +610,23 @@
 
           <button type="button" id="deployBtn" class="btn">Deploy Links</button>
         </div>
+
+        <!-- Keystroke Bindings Panel -->
+        <div class="panel" id="keybindingsPanel">
+          <h2>Keystroke Bindings</h2>
+          <p style="font-size: 13px; color: var(--accents-5); margin-bottom: 20px;">
+            Map keyboard keys to screen jumps. When a key is pressed on the controller (e.g. from a micro:bit), all connected devices will jump to the mapped screens.
+          </p>
+
+          <div id="keyBindingsList"></div>
+
+          <button type="button" id="addKeyBindingBtn" class="btn btn-outline" style="margin-bottom: 16px;">
+            + Add Key Binding
+          </button>
+          <button type="button" id="saveKeyBindingsBtn" class="btn">
+            Save Key Bindings
+          </button>
+        </div>
       </div>
 
       <!-- Generated Links & QRs -->
@@ -846,7 +882,7 @@
           targets: []
         };
 
-        document.querySelectorAll('.device-row').forEach(row => {
+        targetDevicesList.querySelectorAll('.device-row:not(.kb-row)').forEach(row => {
           state.targets.push({
             name: row.querySelector('.device-name').value,
             url: row.querySelector('.device-url').value,
@@ -923,7 +959,7 @@
         }
 
         // Generate URLs
-        const allRows = document.querySelectorAll('.device-row');
+        const allRows = targetDevicesList.querySelectorAll('.device-row:not(.kb-row)');
         allRows.forEach((row, i) => {
           const deviceId = `target-${i}`;
           const name = row.querySelector('.device-name').value;
@@ -980,6 +1016,142 @@
       if (document.getElementById('globalFileId').value && document.getElementById('controllerNode').value) {
         generateCards();
       }
+
+      // ── Keystroke Bindings Logic ─────────────────────────────────────
+      const keyBindingsList = document.getElementById('keyBindingsList');
+      const addKeyBindingBtn = document.getElementById('addKeyBindingBtn');
+      const saveKeyBindingsBtn = document.getElementById('saveKeyBindingsBtn');
+      let keyBindingsData = [];
+
+      function getDeviceList() {
+        const devices = [{ id: 'controller', name: 'Controller' }];
+        targetDevicesList.querySelectorAll('.device-row:not(.kb-row)').forEach((row, i) => {
+          devices.push({ id: `target-${i}`, name: row.querySelector('.device-name').value || `Target ${i}` });
+        });
+        return devices;
+      }
+
+      function renderKeyBindings() {
+        keyBindingsList.innerHTML = '';
+        const devices = getDeviceList();
+
+        keyBindingsData.forEach((binding, bIdx) => {
+          const card = document.createElement('div');
+          card.className = 'kb-row device-row';
+          card.style.position = 'relative';
+
+          let mappingsHtml = '';
+          if (binding.frameMappings) {
+            mappingsHtml = binding.frameMappings.map((m, mIdx) => {
+              const deviceOpts = devices.map(d =>
+                `<option value="${d.id}" ${m.device === d.id ? 'selected' : ''}>${d.name}</option>`
+              ).join('');
+              return `
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; padding: 10px; background: var(--geist-bg); border: 1px solid var(--accents-2); border-radius: var(--radius);">
+                  <select class="kb-mapping-device" data-binding="${bIdx}" data-mapping="${mIdx}" style="flex: 0 0 140px;">
+                    ${deviceOpts}
+                  </select>
+                  <input type="url" class="kb-mapping-url" data-binding="${bIdx}" data-mapping="${mIdx}" value="${m.frameUrl || ''}" placeholder="Paste Figma frame URL..." style="flex: 1;">
+                  <button type="button" class="btn-remove kb-remove-mapping" data-binding="${bIdx}" data-mapping="${mIdx}" style="flex: 0 0 auto;">✕</button>
+                </div>
+              `;
+            }).join('');
+          }
+
+          card.innerHTML = `
+            <div class="device-header">
+              <div style="display: flex; gap: 8px; align-items: center; flex: 1;">
+                <div style="position: relative;">
+                  <input type="text" class="kb-key" data-binding="${bIdx}" value="${binding.key || ''}" maxlength="1" 
+                    placeholder="Key" style="width: 48px; text-align: center; text-transform: uppercase; font-weight: 600; font-size: 16px; padding: 6px; background: var(--accents-1); border: 1px solid var(--accents-3); border-radius: var(--radius);">
+                </div>
+                <input type="text" class="kb-label" data-binding="${bIdx}" value="${binding.label || ''}" placeholder="Label (e.g. Home Screen)" style="flex: 1;">
+              </div>
+              <button type="button" class="btn-remove kb-remove-binding" data-binding="${bIdx}">Remove</button>
+            </div>
+            <div style="margin-top: 12px;">
+              <label style="margin-bottom: 8px;">Device → Target Screen</label>
+              <p style="font-size: 11px; color: var(--accents-4); margin-bottom: 10px;">When this key is pressed, these devices jump to these Figma screens.</p>
+              ${mappingsHtml}
+              <button type="button" class="btn btn-outline kb-add-mapping" data-binding="${bIdx}" style="padding: 6px 12px; font-size: 12px; width: auto;">+ Add Device Target</button>
+            </div>
+          `;
+          keyBindingsList.appendChild(card);
+        });
+
+        // Wire up events
+        keyBindingsList.querySelectorAll('.kb-key').forEach(el => {
+          el.addEventListener('input', e => {
+            keyBindingsData[e.target.dataset.binding].key = e.target.value.slice(-1); // single char
+            e.target.value = e.target.value.slice(-1).toUpperCase();
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-label').forEach(el => {
+          el.addEventListener('input', e => {
+            keyBindingsData[e.target.dataset.binding].label = e.target.value;
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-mapping-device').forEach(el => {
+          el.addEventListener('change', e => {
+            keyBindingsData[e.target.dataset.binding].frameMappings[e.target.dataset.mapping].device = e.target.value;
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-mapping-url').forEach(el => {
+          el.addEventListener('input', e => {
+            keyBindingsData[e.target.dataset.binding].frameMappings[e.target.dataset.mapping].frameUrl = e.target.value;
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-remove-mapping').forEach(el => {
+          el.addEventListener('click', e => {
+            const bIdx = e.target.dataset.binding;
+            const mIdx = e.target.dataset.mapping;
+            keyBindingsData[bIdx].frameMappings.splice(mIdx, 1);
+            renderKeyBindings();
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-remove-binding').forEach(el => {
+          el.addEventListener('click', e => {
+            keyBindingsData.splice(e.target.dataset.binding, 1);
+            renderKeyBindings();
+          });
+        });
+        keyBindingsList.querySelectorAll('.kb-add-mapping').forEach(el => {
+          el.addEventListener('click', e => {
+            const bIdx = e.target.dataset.binding;
+            if (!keyBindingsData[bIdx].frameMappings) keyBindingsData[bIdx].frameMappings = [];
+            keyBindingsData[bIdx].frameMappings.push({ device: 'controller', frameUrl: '' });
+            renderKeyBindings();
+          });
+        });
+      }
+
+      addKeyBindingBtn.addEventListener('click', () => {
+        keyBindingsData.push({ key: '', label: '', frameMappings: [{ device: 'controller', frameUrl: '' }] });
+        renderKeyBindings();
+      });
+
+      // Dedicated socket for key bindings management
+      const kbSocket = io({ transports: ["websocket"] });
+
+      saveKeyBindingsBtn.addEventListener('click', () => {
+        // Validate
+        const invalid = keyBindingsData.some(b => !b.key);
+        if (invalid) {
+          alert('Each key binding must have a key assigned.');
+          return;
+        }
+        kbSocket.emit('save-key-bindings', keyBindingsData);
+        saveKeyBindingsBtn.textContent = 'Saved!';
+        setTimeout(() => saveKeyBindingsBtn.textContent = 'Save Key Bindings', 1500);
+      });
+
+      // Load key bindings from server on connect
+      kbSocket.on('connect', () => {
+        kbSocket.emit('get-key-bindings', (bindings) => {
+          keyBindingsData = bindings || [];
+          renderKeyBindings();
+        });
+      });
 
       fetch('/api/network')
         .then(res => res.json())

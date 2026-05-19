@@ -15,12 +15,25 @@ const PORT = process.env.PORT || 3000;
 const CONFIG_FILE = path.join(__dirname, "configs.json");
 
 let nodeConfigs = {};
+let keyBindings = [];  // Array of { key, label, frameMappings: [{ device, frameUrl }] }
+
 if (fs.existsSync(CONFIG_FILE)) {
   try {
-    nodeConfigs = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    // Separate key bindings from node configs
+    if (raw.__keyBindings) {
+      keyBindings = raw.__keyBindings;
+      delete raw.__keyBindings;
+    }
+    nodeConfigs = raw;
   } catch (e) {
     console.error("Error reading configs.json", e);
   }
+}
+
+function persistConfigs() {
+  const data = { ...nodeConfigs, __keyBindings: keyBindings };
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2));
 }
 
 // ── Serve static files from /public ──────────────────────────────────
@@ -49,15 +62,28 @@ io.on("connection", (socket) => {
   io.emit("clients-count", io.engine.clientsCount);
 
   // Controller or Client sends 'trigger-action' → broadcast 'execute-action'
-  
+
   socket.on("save-config", ({ nodeId, areas }) => {
     if (nodeId) {
       nodeConfigs[nodeId] = areas;
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(nodeConfigs, null, 2));
+      persistConfigs();
       console.log(`[+] Saved ${areas.length} areas for node ${nodeId}`);
       // Broadcast to any clients currently on this node
       io.emit("config-updated", { nodeId, areas });
     }
+  });
+
+  // ── Key Bindings ─────────────────────────────────────────────────
+  socket.on("save-key-bindings", (bindings) => {
+    keyBindings = bindings || [];
+    persistConfigs();
+    console.log(`[⌨] Saved ${keyBindings.length} key bindings`);
+    // Broadcast updated bindings to all controllers
+    io.emit("key-bindings-updated", keyBindings);
+  });
+
+  socket.on("get-key-bindings", (callback) => {
+    if (callback) callback(keyBindings);
   });
 
   socket.on("get-config", (nodeId, callback) => {

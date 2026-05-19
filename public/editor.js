@@ -19,7 +19,7 @@ function parseFigmaUrl(url) {
 }
 
 window.openGlobalAreaEditor = function() {
-  allAvailableDevices = Array.from(document.querySelectorAll('.device-row')).map((r, i) => ({
+  allAvailableDevices = Array.from(document.querySelectorAll('#targetDevicesList .device-row:not(.kb-row)')).map((r, i) => ({
     id: `target-${i}`, name: r.querySelector('.device-name').value
   }));
   
