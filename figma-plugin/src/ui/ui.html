@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────── */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --bg-primary: #18181b;
+      --bg-secondary: #27272a;
+      --bg-tertiary: #3f3f46;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.15);
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent: #10b981;
+      --accent-dim: rgba(16,185,129,0.15);
+      --accent-hover: #34d399;
+      --danger: #ef4444;
+      --danger-dim: rgba(239,68,68,0.15);
+      --radius: 10px;
+      --radius-sm: 6px;
+      --radius-lg: 14px;
+    }
+
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 12px;
+      color: var(--text-primary);
+      background: var(--bg-primary);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    /* ── Tab Navigation ────────────────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-primary);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px 8px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover { color: var(--text-secondary); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-panel { display: none; padding: 16px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared Components ─────────────────────────────────────── */
+    .section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: var(--border-hover); }
+
+    .btn-danger {
+      background: var(--danger-dim);
+      color: var(--danger);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+    .btn-sm { padding: 5px 10px; font-size: 11px; width: auto; }
+
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--text-muted); }
+
+    label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .field { margin-bottom: 10px; }
+
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { flex: 1; }
+
+    /* ── Tap Area Cards ────────────────────────────────────────── */
+    .area-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .area-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .area-card-name {
+      font-weight: 600;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .area-badge {
+      display: inline-flex;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    .area-badge-auto {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .area-badge-manual {
+      background: rgba(99,102,241,0.15);
+      color: #818cf8;
+    }
+
+    .area-coords {
+      font-family: "SF Mono", Monaco, monospace;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ── Device Cards ──────────────────────────────────────────── */
+    .device-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+
+    .device-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    /* ── Frame Mapping ─────────────────────────────────────────── */
+    .mapping-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .mapping-device {
+      font-size: 11px;
+      font-weight: 600;
+      min-width: 80px;
+      color: var(--text-secondary);
+    }
+
+    .mapping-arrow {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    /* ── Status Bar ────────────────────────────────────────────── */
+    .status-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .status-dot.connected {
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(16,185,129,0.5);
+    }
+
+    /* ── Empty State ───────────────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+    }
+
+    .empty-state-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .empty-state-title {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    /* ── Scrollbar ─────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+    /* ── Toast ──────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 48px;
+      left: 16px;
+      right: 16px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 100;
+      transform: translateY(20px);
+      opacity: 0;
+      transition: all 0.2s;
+      pointer-events: none;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(16,185,129,0.3); }
+    .toast.error { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  </style>
+</head>
+<body>
+
+  <!-- Tab Navigation -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="devices">📱 Devices</button>
+    <button class="tab-btn" data-tab="areas">🎯 Tap Areas</button>
+    <button class="tab-btn" data-tab="sync">☁️ Sync</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- DEVICES TAB -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div id="panel-devices" class="tab-panel active">
+
+    <div class="section">
+      <div class="section-title">📄 File Info</div>
+      <div class="row">
+        <div class="field">
+          <label>File</label>
+          <div id="file-name" style="font-weight:600; color: var(--text-primary);">—</div>
+        </div>
+        <div class="field">
+          <label>Screens Found</label>
+          <div id="frame-count" style="font-weight:600; color: var(--accent);">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📱 Devices</div>
+      <p class="section-subtitle">Define your physical screens. Assign each a starting Figma frame.</p>
+      <div id="devices-list"></div>
+      <button class="btn btn-secondary" id="add-device-btn" style="margin-top: 8px;">+ Add Device</button>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- TAP AREAS TAB -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div id="panel-areas" class="tab-panel">
+
+    <div class="section">
+      <div class="section-title">🔍 Auto-Detect</div>
+      <p class="section-subtitle">Select a frame on the canvas, then scan it for interactive elements (nodes with prototyping reactions).</p>
+      <div class="row">
+        <button class="btn btn-primary" id="scan-frame-btn">Scan Selected Frame</button>
+        <button class="btn btn-secondary" id="scan-all-btn" style="flex: 0.6;">Scan All</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">
+        🎯 Detected Areas
+        <span id="area-count" class="area-badge area-badge-auto">0</span>
+      </div>
+      <div id="areas-list">
+        <div class="empty-state">
+          <div class="empty-state-icon">🎯</div>
+          <div class="empty-state-title">No tap areas yet</div>
+          <div>Select a frame and click "Scan" to auto-detect interactive elements.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- SYNC TAB -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div id="panel-sync" class="tab-panel">
+
+    <div class="section">
+      <div class="section-title">☁️ Push to Cloud</div>
+      <p class="section-subtitle">Send your entire config (devices, tap areas, key bindings) to the MultiFig web app.</p>
+
+      <div class="field">
+        <label>Room Code</label>
+        <input type="text" id="room-code-input" placeholder="e.g. A7B2" maxlength="4" style="text-transform: uppercase; text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 4px; font-family: 'SF Mono', Monaco, monospace;">
+      </div>
+
+      <div class="field">
+        <label>MultiFig URL</label>
+        <input type="url" id="saas-url-input" placeholder="https://multifig.vercel.app" value="https://multifig.vercel.app">
+      </div>
+
+      <button class="btn btn-primary" id="push-btn" style="margin-top: 8px;">🚀 Push Config to Room</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">💾 File Storage</div>
+      <p class="section-subtitle">Save the config into the Figma file itself so it travels with the .fig file.</p>
+      <div class="row">
+        <button class="btn btn-secondary" id="save-to-file-btn">Save to File</button>
+        <button class="btn btn-secondary" id="load-from-file-btn">Load from File</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📋 Export</div>
+      <button class="btn btn-secondary" id="export-json-btn">Copy Config as JSON</button>
+    </div>
+
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Ready</span>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- SCRIPT_PLACEHOLDER -->
+</body>
+</html>
