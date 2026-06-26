@@ -36,6 +36,16 @@ function persistConfigs() {
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(data, null, 2));
 }
 
+// ── Express Middleware ───────────────────────────────────────────────
+app.use(express.json({ limit: "50mb" }));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(200);
+  next();
+});
+
 // ── Serve static files from /public ──────────────────────────────────
 app.use(express.static("public"));
 
@@ -51,6 +61,43 @@ app.get("/api/network", (req, res) => {
     }
   }
   res.json({ ips });
+});
+
+// ── API endpoint for Figma Plugin Sync ──────────────────────────────
+app.post("/api/plugin-config", (req, res) => {
+  const config = req.body;
+  if (!config || !config.version) {
+    return res.status(400).json({ error: "Invalid config payload" });
+  }
+
+  console.log(`[+] Received Figma plugin config (v${config.version})`);
+
+  if (config.version === 2 && config.tapAreas) {
+    // Group tap areas by screenId (nodeId) to match legacy v1 format
+    const byScreen = {};
+    for (const area of config.tapAreas) {
+      if (!byScreen[area.screenId]) byScreen[area.screenId] = [];
+      byScreen[area.screenId].push(area);
+    }
+
+    // Merge into local nodeConfigs
+    for (const [screenId, areas] of Object.entries(byScreen)) {
+      nodeConfigs[screenId] = areas;
+      // Broadcast to local clients
+      io.emit("config-updated", { nodeId: screenId, areas });
+    }
+
+    // Map keybindings if available
+    if (config.keyBindings) {
+      keyBindings = config.keyBindings;
+      io.emit("key-bindings-updated", keyBindings);
+    }
+
+    persistConfigs();
+    return res.json({ success: true, message: "Synced plugin config to local server" });
+  }
+
+  res.status(400).json({ error: "Unsupported config version" });
 });
 
 // ── Socket.io routing ────────────────────────────────────────────────
